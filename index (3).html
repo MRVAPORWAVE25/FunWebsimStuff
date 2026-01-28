@@ -1,0 +1,3368 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <!--
+    noVNC example: lightweight example using minimal UI and features
+
+    This is a self-contained file which doesn't import WebUtil or external CSS.
+
+    Copyright (C) 2019 The noVNC authors
+    noVNC is licensed under the MPL 2.0 (see LICENSE.txt)
+    This file is licensed under the 2-Clause BSD license (see LICENSE.txt).
+
+    Connect parameters are provided in query string:
+        http://example.com/?host=HOST&port=PORT&scale=true
+    -->
+    <title>noVNC</title>
+    <link rel="stylesheet" href="style.css">
+    <style id="custom-theme-style"></style>
+
+    <style>
+      /* Unified Modal & Pop-up Styling */
+      .theme-modal, #sh-tutorial-modal, #custom-popup-modal, #vm-rules-modal, #rules-modal, #manual-password-modal, #report-modal, #profile-popup-modal, #mobile-options-modal, #osSwitcherContainer {
+        background: linear-gradient(180deg, rgba(15, 23, 42, 0.98), rgba(10, 14, 24, 0.98)) !important;
+        border: 1px solid rgba(79, 211, 255, 0.3) !important;
+        box-shadow: 0 0 40px rgba(0, 0, 0, 0.8), 0 0 20px rgba(79, 211, 255, 0.05) !important;
+        backdrop-filter: blur(12px) !important;
+        border-radius: 16px !important;
+      }
+
+      .modal-overlay {
+        position: fixed;
+        inset: 0;
+        background: rgba(0, 0, 0, 0.85) !important;
+        z-index: 10060;
+        display: none;
+        align-items: center;
+        justify-content: center;
+        backdrop-filter: blur(10px) !important;
+      }
+
+      @media (max-width: 600px) {
+        #sh-tutorial-modal, #mobile-options-modal, #vm-rules-modal, #osSwitcherContainer, #rules-modal, #manual-password-modal, #report-modal, #custom-popup-modal, #profile-popup-modal {
+          width: 100% !important;
+          height: 100% !important;
+          max-width: none !important;
+          max-height: none !important;
+          border-radius: 0 !important;
+          padding: 20px 15px 120px 15px !important;
+          border: none !important;
+          box-shadow: none !important;
+          flex-direction: column !important;
+          justify-content: flex-start !important;
+          overflow-y: auto !important;
+          overflow-x: hidden !important;
+          inset: 0 !important;
+          box-sizing: border-box !important;
+          z-index: 10060 !important;
+        }
+        #mobile-options-modal, #vm-rules-modal, #rules-modal, #manual-password-modal, #report-modal, #custom-popup-modal, #profile-popup-modal {
+          display: flex !important;
+        }
+        #osSwitcherContainer {
+          display: none !important; /* Controlled by .active class */
+        }
+        #osSwitcherContainer.active {
+          display: flex !important;
+        }
+        #mobile-options-list {
+          flex: 1 !important;
+          overflow-y: auto !important;
+          padding: 10px 0 !important;
+          display: flex;
+          flex-direction: column;
+          gap: 12px;
+        }
+        #mobile-options-modal h3 {
+          text-align: center;
+          margin-bottom: 20px !important;
+          font-size: 24px !important;
+        }
+      }
+
+      .theme-modal h3, #custom-popup-title, #vm-rules-title, #report-modal-title {
+        background: linear-gradient(90deg, #bfe7ff, #4fd3ff);
+        -webkit-background-clip: text;
+        -webkit-text-fill-color: transparent;
+        font-weight: 800 !important;
+        letter-spacing: 0.05em !important;
+        text-transform: uppercase;
+      }
+
+      .custom-popup-btn {
+        text-transform: uppercase;
+        letter-spacing: 0.05em;
+        font-size: 12px !important;
+        padding: 10px 20px !important;
+      }
+
+      /* Moderator VM Menu Styles */
+      .vm-mod-dots {
+        position: absolute;
+        top: 8px;
+        right: 42px; /* Offset for player count */
+        width: 24px;
+        height: 24px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        background: rgba(0,0,0,0.4);
+        border: 1px solid rgba(255,255,255,0.1);
+        border-radius: 4px;
+        color: #fff;
+        font-size: 14px;
+        cursor: pointer;
+        z-index: 10;
+        opacity: 0.7;
+        transition: all 0.2s;
+        line-height: 1;
+        padding-bottom: 4px;
+      }
+      .vm-mod-dots:hover {
+        opacity: 1;
+        background: rgba(0,0,0,0.6);
+        border-color: rgba(255,255,255,0.3);
+        transform: scale(1.1);
+      }
+      .vm-mod-dropdown {
+        position: absolute;
+        top: 36px;
+        right: 42px; /* Align with dots */
+        background: #1a233a;
+        border: 1px solid #4a5d85;
+        border-radius: 8px;
+        box-shadow: 0 8px 24px rgba(0,0,0,0.6);
+        z-index: 100;
+        display: none;
+        flex-direction: column;
+        min-width: 140px;
+        overflow: hidden;
+        backdrop-filter: blur(8px);
+      }
+      .vm-mod-dropdown.active { display: flex; }
+      .vm-mod-item {
+        padding: 10px 14px;
+        font-size: 12px;
+        font-weight: 600;
+        color: #dbe9ff;
+        cursor: pointer;
+        border-bottom: 1px solid rgba(255,255,255,0.05);
+        text-align: left;
+        transition: background 0.2s;
+      }
+      .vm-mod-item:hover { background: rgba(255,255,255,0.1); color: #fff; }
+      .vm-mod-item:last-child { border-bottom: none; }
+      .vm-mod-item.danger { color: #ff6b6b; }
+      .vm-mod-item.danger:hover { background: rgba(255,107,107,0.15); }
+
+      .os-switch-btn.vm-hidden {
+        opacity: 0.5;
+        border-style: dashed !important;
+      }
+
+      .os-switch-btn.vm-hidden::after {
+        content: ' (HIDDEN)';
+        font-size: 10px;
+        font-weight: bold;
+        color: #ff6b6b;
+      }
+
+      /* Edit VM Modal */
+      #edit-vm-overlay {
+        position: fixed;
+        inset: 0;
+        background: rgba(0,0,0,0.75);
+        z-index: 10050;
+        display: none;
+        align-items: center;
+        justify-content: center;
+        backdrop-filter: blur(6px);
+      }
+      #edit-vm-modal {
+        background: linear-gradient(180deg, #1a233a, #0f1524);
+        border: 1px solid #4a5d85;
+        border-radius: 12px;
+        width: 90%;
+        max-width: 500px;
+        padding: 24px;
+        box-shadow: 0 20px 50px rgba(0,0,0,0.7);
+        display: flex;
+        flex-direction: column;
+        gap: 16px;
+      }
+      .edit-vm-field { display: flex; flex-direction: column; gap: 6px; }
+      .edit-vm-field label { font-size: 12px; font-weight: 700; color: #8fb3ff; text-transform: uppercase; letter-spacing: 0.05em; }
+      .edit-vm-field input, .edit-vm-field textarea {
+        background: #0a0e1a;
+        border: 1px solid rgba(120,150,200,0.3);
+        border-radius: 6px;
+        padding: 10px;
+        color: #fff;
+        font-family: inherit;
+        outline: none;
+      }
+      .edit-vm-field input:focus { border-color: #4fd3ff; box-shadow: 0 0 0 2px rgba(79,211,255,0.1); }
+      .edit-vm-field textarea { font-family: monospace; font-size: 12px; min-height: 120px; resize: vertical; }
+
+      /* Chat Minimize to Plus Button FAB Style */
+      #chatContainer.minimized {
+        width: 54px !important;
+        height: 54px !important;
+        min-width: 54px !important;
+        border-radius: 50% !important;
+        bottom: 24px !important;
+        right: 24px !important;
+        opacity: 1 !important;
+        transition: all 0.25s cubic-bezier(0.175, 0.885, 0.32, 1.275) !important;
+        box-shadow: 0 6px 20px rgba(0,0,0,0.6), 0 0 15px rgba(79, 211, 255, 0.25) !important;
+        border: 2px solid rgba(79, 211, 255, 0.5) !important;
+        background: linear-gradient(135deg, #1e293b, #0f172a) !important;
+        cursor: pointer;
+        padding: 0 !important;
+        display: flex !important;
+        align-items: center !important;
+        justify-content: center !important;
+        overflow: visible !important;
+      }
+      #chatContainer.minimized:hover {
+        transform: scale(1.1) rotate(90deg) !important;
+        border-color: #4fd3ff !important;
+        box-shadow: 0 8px 25px rgba(0,0,0,0.7), 0 0 20px rgba(79, 211, 255, 0.4) !important;
+      }
+      #chatContainer.minimized.has-unread {
+        border-color: #ffffff !important;
+        box-shadow: 0 0 15px rgba(255, 255, 255, 0.4), 0 6px 20px rgba(0,0,0,0.6) !important;
+      }
+      #chatContainer.minimized.has-mention::after {
+        content: attr(data-mentions);
+        position: absolute;
+        top: -4px;
+        right: -4px;
+        min-width: 20px;
+        height: 20px;
+        background-color: #ff4646;
+        border: 2px solid #0f172a;
+        border-radius: 12px;
+        z-index: 10;
+        box-shadow: 0 0 8px rgba(255, 70, 70, 0.6);
+        color: white;
+        font-size: 11px;
+        font-weight: 800;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        padding: 0 4px;
+        font-family: sans-serif;
+      }
+      #chatContainer.minimized #chatHeader {
+        height: 100% !important;
+        width: 100% !important;
+        padding: 0 !important;
+        border: none !important;
+        background: transparent !important;
+        display: flex !important;
+        align-items: center !important;
+        justify-content: center !important;
+        margin: 0 !important;
+      }
+      #chatContainer.minimized #chatHeader .chat-title {
+        display: none !important;
+      }
+      #chatContainer.minimized #chatMinimizeBtn {
+        width: 100% !important;
+        height: 100% !important;
+        margin: 0 !important;
+        border: none !important;
+        background: transparent !important;
+        font-size: 36px !important;
+        color: #4fd3ff !important;
+        display: flex !important;
+        align-items: center !important;
+        justify-content: center !important;
+        padding: 0 0 6px 0 !important;
+        cursor: pointer;
+      }
+      #chatContainer.minimized #chatMessages,
+      #chatContainer.minimized #chatInput {
+        display: none !important;
+      }
+    </style>
+
+    <!-- Import OS icons (public CDN or fallback emoji for now) -->
+    <!-- If you want to use images, adjust src accordingly (SVG/PNG links) -->
+
+    <!-- Import map for libraries -->
+    <script type="importmap">
+    {
+      "imports": {
+        "marked": "https://cdn.jsdelivr.net/npm/marked/lib/marked.esm.js",
+        "dompurify": "https://cdn.jsdelivr.net/npm/dompurify/dist/purify.es.min.js",
+        "novnc": "https://cdn.jsdelivr.net/npm/@novnc/novnc@1.5.0/+esm"
+      }
+    }
+    </script>
+
+    <script type="module" crossorigin="anonymous" src="script.js">
+      
+    </script>
+  </head>
+
+  <body>
+    <div id="loading-overlay">
+      <div id="loading-spinner"></div>
+      <p id="loading-text">Connecting to server...</p>
+    </div>
+    <div id="notification-container"></div>
+    <div id="header-bar">
+      <span id="status">Connecting...</span>
+      <div id="header-controls">
+        <button id="playerListToggle" aria-label="Players" class="header-icon-btn mobile-hide">👥 <span class="btn-text">Players</span></button>
+        <button id="profile-button" aria-label="Profile" title="Profile" class="header-icon-btn mobile-hide">👤 <span class="btn-text">Profile</span></button>
+        <button id="announcementComposerToggle" aria-label="Compose Announcement" title="Compose Announcement" class="header-icon-btn mobile-hide">📢 <span class="btn-text">Announce</span></button>
+        <!-- Reconnect button will be inserted here by script -->
+        <!-- Retype Password button will be inserted here by script -->
+        <!-- Custom Themes button -->
+        <button id="custom-themes-button" aria-label="Custom Themes" title="Custom Themes" class="header-icon-btn mobile-hide">🎨 <span class="btn-text">Themes</span></button>
+        <!-- Settings button -->
+        <button id="settings-button" aria-label="Settings" title="Settings" class="header-icon-btn mobile-hide">⚙️ <span class="btn-text">Settings</span></button>
+        <button id="mobile-options-toggle" aria-label="Options" title="Options" class="header-icon-btn mobile-only">☰</button>
+      </div>
+    </div>
+    <!-- Settings Panel -->
+    <div id="settings-panel" role="dialog" aria-label="Settings">
+      <h4>Theme</h4>
+      <label class="theme-option">
+        <input type="radio" name="theme" value="planet">
+        <span>Planet (current)</span>
+      </label>
+      <label class="theme-option">
+        <input type="radio" name="theme" value="dark">
+        <span>Dark Mode</span>
+      </label>
+      <label class="theme-option">
+        <input type="radio" name="theme" value="light">
+        <span>Light Mode</span>
+      </label>
+      <label class="theme-option">
+        <input type="radio" name="theme" value="plant">
+        <span>Plant</span>
+      </label>
+      <label class="theme-option">
+        <input type="radio" name="theme" value="matrix">
+        <span>Matrix</span>
+      </label>
+      <label class="theme-option">
+        <input type="radio" name="theme" value="sunset">
+        <span>Sunset</span>
+      </label>
+      <label class="theme-option">
+        <input type="radio" name="theme" value="ocean">
+        <span>Ocean</span>
+      </label>
+      <label class="theme-option">
+        <input type="radio" name="theme" value="festive">
+        <span>Festive 🎄</span>
+      </label>
+      
+      <h4 style="margin-top: 10px;">Visuals</h4>
+      <label class="theme-option">
+          <input type="checkbox" id="festive-effects-toggle">
+          <span>Enable Festive Effects ❄️</span>
+      </label>
+
+      <h4 style="margin-top: 10px;">Chat</h4>
+      <label class="theme-option">
+          <input type="checkbox" id="hide-images-toggle">
+          <span>Hide Images in Chat</span>
+      </label>
+      <h4 style="margin-top: 10px;">Advanced</h4>
+      <label class="theme-option">
+          <input type="checkbox" id="test-mode-toggle">
+          <span>Test Mode</span>
+      </label>
+      <label class="theme-option" style="margin-top: 10px;">
+          <input type="checkbox" id="vm-notifications-toggle">
+          <span>Status Notifications</span>
+      </label>
+      
+      <h4 style="margin-top: 10px;">Spawn Preference</h4>
+      <label class="theme-option">
+          <input type="radio" name="spawn-pref" value="random" checked>
+          <span>Go to Random Online</span>
+      </label>
+      <label class="theme-option">
+          <input type="radio" name="spawn-pref" value="default">
+          <span>Go to Default VM</span>
+      </label>
+
+      <h4 style="margin-top:10px;">Tip Requests</h4>
+      <label class="theme-option">
+        <span>Tip page size: <strong id="tip-limit-val">50</strong></span>
+        <input type="range" id="tip-limit" min="10" max="100" step="10">
+      </label>
+      <label class="theme-option">
+        <span>Start offset: <strong id="tip-offset-val">0</strong></span>
+        <input type="range" id="tip-offset" min="0" max="500" step="10">
+      </label>
+    </div>
+    
+    <!-- Custom Themes Panel -->
+    <div id="custom-themes-panel" role="dialog" aria-label="Custom Themes">
+      <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:6px;">
+        <h4 style="margin:0;">Custom Themes</h4>
+        <button id="refresh-themes-btn" title="Refresh List" style="background:transparent; border:none; color:#bfe7ff; cursor:pointer; font-size:16px; padding:0 4px; line-height:1;">↻</button>
+      </div>
+      <input type="text" id="theme-search-input" placeholder='Search (e.g. author:"..." css:"...")' class="theme-search-input">
+      <button id="create-theme-btn" class="custom-popup-btn secondary" style="width:100%; margin-bottom:8px; font-size:12px;">+ Create Theme</button>
+      <div id="custom-themes-list"></div>
+    </div>
+
+    <div id="announcementComposer">
+      <label for="announcement-textarea">Announcement:</label>
+      <textarea id="announcement-textarea" placeholder="Enter announcement…"></textarea>
+      <button id="announcementComposeBtn" disabled>Post Announcement</button>
+    </div>
+    <div id="sendCtrlAltDelButton" style="display: none">Send CtrlAltDel</div>
+    <div id="screen">
+      <!-- This is where the remote screen will appear -->
+    </div>
+    <div id="bottom-bar">
+      <div id="network-reconnect-btn" class="header-icon-btn" title="Click to reconnect (fixes chat/errors)">🌐 <span class="btn-text">Network</span></div>
+      <button id="keyboard-button" class="header-icon-btn" title="Show Keyboard (Mobile)">⌨️ <span class="btn-text">Keyboard</span></button>
+      <div id="sendCtrlAltDelButton-bottom" class="header-icon-btn">🚨 <span class="btn-text">CAD</span></div>
+      <div class="shortcut-btn header-icon-btn" data-shortcut="alt-f4" title="Alt+F4">✖️ <span class="btn-text">Alt+F4</span></div>
+      <div class="shortcut-btn header-icon-btn" data-shortcut="win-r" title="Win+R">🏃 <span class="btn-text">Run</span></div>
+      <div class="shortcut-btn header-icon-btn" data-shortcut="win" title="Win Key">🏁 <span class="btn-text">Start</span></div>
+      <div class="shortcut-btn header-icon-btn" data-shortcut="alt-tab" title="Alt+Tab">📑 <span class="btn-text">Tab</span></div>
+    </div>
+
+
+    <div id="chatContainer">
+      <div id="chatHeader">
+        <span class="chat-title">Chat</span>
+        <button id="chatMinimizeBtn" title="Minimize chat">–</button>
+      </div>
+      <div id="chatMessages"></div>
+      <div id="chatInput">
+        <button id="chatSettingsBtn" title="Chat Settings">⚙️</button>
+        <div id="chatMentionList" class="mention-list hidden"></div>
+        <div id="chatTextInput" role="textbox" contenteditable="true" placeholder="Type a message..." maxlength="500" spellcheck="false"></div>
+        <button id="chatImageButton" title="Send Image">🖼️</button>
+        <button id="chatSendButton">Send</button>
+      </div>
+      <div id="chatSettingsPanel" class="chat-settings-panel hidden">
+        <h4>Chat Notifications</h4>
+        <div class="chat-settings-group">
+            <label><input type="radio" name="ping-mode" value="none"> Never ping me</label>
+            <label><input type="radio" name="ping-mode" value="mention" checked> Ping me on mention</label>
+            <label><input type="radio" name="ping-mode" value="all"> Ping me on message</label>
+        </div>
+        <div class="chat-settings-group">
+            <label><input type="checkbox" id="chat-ping-sound" checked> Play sound on ping</label>
+            <label><input type="checkbox" id="chat-ping-bounce" checked> Bounce button on ping</label>
+            <label><input type="checkbox" id="chat-ping-open"> Ping me when chat is open</label>
+        </div>
+        <button id="chatSettingsClose" class="custom-popup-btn secondary" style="width:100%; margin-top:8px; font-size:11px;">Close</button>
+      </div>
+    </div>
+    <input type="text" id="hidden-keyboard-input" style="position: absolute; top: -1000px; left: -1000px; opacity: 0; width: 0; height: 0; pointer-events: none;"/>
+    <input
+      type="hidden"
+      id="hidden_clipboard_reciver"
+      onclick="write_clipboard()"
+      value=""
+    />
+    <input type="file" id="chatImageInput" accept="image/*" style="display: none;" />
+    <input
+      type="hidden"
+      id="hidden_clipboard_sender"
+      onclick="send_clipboard()"
+      value=""
+    />
+    <!-- The #announcementBar and #announcementComposer are added dynamically above -->
+
+    <!-- Global Rules Modal -->
+    <div id="rules-overlay" style="display:none;">
+      <div id="rules-modal">
+        <h3>Welcome to VMsHARE</h3>
+        <div class="rules-content">
+          <p>Please read and agree to the following rules before using VMsHARE:</p>
+          <ul>
+            <li>Be respectful to other users</li>
+            <li>Do not engage in malicious activities</li>
+            <li>Follow the specific rules for each VM</li>
+            <li>Report any issues or violations to the team</li>
+          </ul>
+        </div>
+        <div class="rules-checkbox-container">
+          <input type="checkbox" id="rules-checkboxx">
+          <label id="rules-checkbox-label">
+            I have read and agree to the rules
+          </label>
+        </div>
+        <div class="rules-actions">
+          <button id="rules-done-btn" disabled>Continue</button>
+        </div>
+        <span id="rules-countdown" style="display:none;"></span>
+      </div>
+    </div>
+
+    <!-- VM-specific Rules Modal -->
+    <div id="vm-rules-overlay">
+      <div id="vm-rules-modal">
+        <h3 id="vm-rules-title">VM Rules</h3>
+        <div class="vm-name"></div>
+        <img id="vm-rules-thumbnail" src="" alt="VM Thumbnail" style="max-width: 100%; max-height: 200px; object-fit: contain; border-radius: 8px; margin-bottom: 10px;">
+        <div id="vm-rules-prompt" style="font-size:14px;font-weight:600;margin-bottom:6px;display:none;"></div>
+        <div class="vm-rules-desc" style="font-size:13px;opacity:.9;margin-bottom:6px;"></div>
+        <ul class="vm-rules-list"></ul>
+        <div id="vm-rules-controls-section" style="display:none; margin-bottom:15px; border-top:1px solid rgba(255,255,255,0.1); padding-top:10px;">
+          <h4 style="margin-top:0;">VM Controls:</h4>
+          <div id="vm-rules-controls-list" style="display:flex; flex-wrap:wrap; gap:8px;"></div>
+          <div id="vm-active-vote-section" style="display:none; margin-top:12px; padding:10px; background:rgba(79,211,255,0.1); border-radius:8px; border:1px solid rgba(79,211,255,0.3);">
+            <div id="vm-vote-title" style="font-size:12px; font-weight:800; color:#4fd3ff; margin-bottom:5px;">ACTIVE VOTE</div>
+            <div id="vm-vote-stats" style="font-size:11px; margin-bottom:8px;">Yes: 0 | No: 0 (Need 2+ votes & 50%)</div>
+            <div style="display:flex; gap:6px;">
+                <button id="vm-vote-yes" class="custom-popup-btn primary" style="padding:4px 10px; font-size:10px;">VOTE YES</button>
+                <button id="vm-vote-no" class="custom-popup-btn secondary" style="padding:4px 10px; font-size:10px;">VOTE NO</button>
+            </div>
+          </div>
+        </div>
+        <div id="vm-rules-players-section">
+          <h4>Players in this VM:</h4>
+          <ul id="vm-rules-players-list"></ul>
+        </div>
+        <div class="vm-rules-actions">
+          <button id="vm-rules-decline">Decline</button>
+          <button id="vm-rules-agree">Agree & Enter</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- Manual Password Modal -->
+    <div id="manual-password-overlay" style="display:none;">
+      <div id="manual-password-modal" style="display:none;"></div>
+    </div>
+
+    <!-- Player List Container -->
+    <div id="playerListContainer" class="hidden">
+      <h3 id="playerListContainer-title">Players Online</h3>
+      <button id="playerListClose" title="Close players">&times;</button>
+      <div id="playerListContent">
+        <!-- Player sections and items will be dynamically inserted here by multiplayer-cursors.js -->
+      </div>
+    </div>
+
+    <!-- Mobile Options Panel -->
+    <div id="mobile-options-overlay" class="modal-overlay" style="display:none;">
+      <div id="mobile-options-modal" class="theme-modal">
+        <h3>Options</h3>
+        <div id="mobile-options-list" style="display:flex; flex-direction:column; gap:8px;">
+          <!-- Options will be populated here -->
+        </div>
+        <div class="theme-actions" style="margin-top:10px;">
+          <button id="mobile-options-close" class="custom-popup-btn secondary" style="width:100%;">Close</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- Custom Popup -->
+    <div id="custom-popup-overlay">
+      <div id="custom-popup-modal">
+        <h3 id="custom-popup-title"></h3>
+        <div id="custom-popup-message"></div>
+        <div id="custom-popup-buttons"></div>
+      </div>
+    </div>
+
+    <!-- Report Modal -->
+    <div id="report-modal-overlay">
+      <div id="report-modal">
+        <h3 id="report-modal-title">Report VM</h3>
+        <div id="report-modal-vm-name"></div>
+        <textarea id="report-modal-reason" placeholder="Please provide a reason for the report..."></textarea>
+        <div id="report-modal-buttons">
+          <button id="report-modal-cancel" class="custom-popup-btn secondary">Cancel</button>
+          <button id="report-modal-submit" class="custom-popup-btn primary">Submit Report</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- Image Viewer Modal -->
+    <div id="image-viewer-overlay">
+      <button id="image-viewer-close">&times;</button>
+      <div id="image-viewer-content">
+        <img id="image-viewer-img" src="" alt="Full size image" />
+      </div>
+    </div>
+
+    <!-- Moderator Action Popups (Replaced Ban Editor) -->
+    
+    <!-- Mod Hub Menu -->
+    <div id="mod-hub-overlay" class="mod-overlay" style="display:none; position:fixed; inset:0; background:rgba(0,0,0,0.7); z-index:10070; align-items:center; justify-content:center; backdrop-filter:blur(4px);">
+      <div class="theme-modal" style="width:300px; border-color:#ff6b6b;">
+        <h3 id="mod-hub-title" style="color:#ff6b6b; margin:0 0 10px 0;">Moderation Hub</h3>
+        <div id="mod-hub-userinfo" style="font-size:11px; margin-bottom:15px; opacity:0.8;"></div>
+        <div style="display:flex; flex-direction:column; gap:10px;">
+          <button id="mod-hub-btn-kick" class="custom-popup-btn secondary" style="text-align:left; padding:12px;">👢 Kick User / IP...</button>
+          <button id="mod-hub-btn-ban" class="custom-popup-btn secondary" style="text-align:left; padding:12px;">🚫 Ban / Unban...</button>
+          <button id="mod-hub-btn-blacklist" class="custom-popup-btn secondary" style="text-align:left; padding:12px;">📜 VM Blacklist (Multi)...</button>
+          <button id="mod-hub-btn-tags" class="custom-popup-btn secondary" style="text-align:left; padding:12px;">🏷️ Manage Tags...</button>
+          <button id="mod-hub-btn-attributes" class="custom-popup-btn secondary" style="text-align:left; padding:12px;">⚙️ Set Attributes...</button>
+          <button id="mod-hub-btn-add-port" class="custom-popup-btn secondary" style="text-align:left; padding:12px;">➕ Add Port Mapping...</button>
+        </div>
+        <div class="theme-actions" style="margin-top:15px;">
+          <button id="mod-hub-close" class="custom-popup-btn secondary" style="width:100%;">Close</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- Self Host Modal -->
+    <div id="self-host-overlay" class="modal-overlay" style="display:none; position:fixed; inset:0; background:rgba(0,0,0,0.85); z-index:10090; align-items:center; justify-content:center; backdrop-filter:blur(8px);">
+        <div id="self-host-modal" class="theme-modal" style="width: 90%; max-width: 500px; max-height: 90vh; overflow-y: auto; padding: 24px;">
+            <div id="sh-error-container" style="display:none; background:rgba(255,80,80,0.1); border:1px solid #ff6b6b; color:#ffb4a8; padding:12px; border-radius:8px; margin-bottom:15px; font-size:13px; font-weight:600; line-height:1.4; animation: fadeIn 0.3s ease-out;"></div>
+            <h3 id="self-host-title">Self-Host Your VM</h3>
+            <p style="font-size: 11px; opacity: 0.7; margin-bottom: 15px;">Host your own VNC server on VMsHARE! Your VM must be publicly accessible and online to be added.</p>
+            
+            <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 12px;">
+                <div class="edit-vm-field">
+                    <label>VM Name *</label>
+                    <input type="text" id="sh-name" maxlength="20" placeholder="My cool VM">
+                </div>
+                <div class="edit-vm-field">
+                    <label>Path (Slug) *</label>
+                    <input type="text" id="sh-path" maxlength="20" placeholder="my-vm">
+                </div>
+            </div>
+
+            <div class="edit-vm-field">
+                <label>Location (VNC Endpoint) *</label>
+                <input type="text" id="sh-location" placeholder="wss://example.com/ws">
+            </div>
+
+            <div class="edit-vm-field">
+                <label>Icon URL *</label>
+                <input type="text" id="sh-icon" placeholder="https://...">
+            </div>
+
+            <div class="edit-vm-field">
+                <label>Categories (comma separated) *</label>
+                <input type="text" id="sh-categories" placeholder="windows, gaming">
+            </div>
+
+            <div class="edit-vm-field">
+                <label>Description</label>
+                <textarea id="sh-desc" style="min-height: 50px;" placeholder="What is this VM about?"></textarea>
+            </div>
+
+            <div style="margin-top: 10px; padding-top: 10px; border-top: 1px solid rgba(255,255,255,0.1);">
+                <button id="toggle-sh-advanced" style="background:none; border:none; color:#8fb3ff; cursor:pointer; font-size:11px; padding:0; text-decoration:underline;">Toggle Advanced Options</button>
+                <div id="sh-advanced-fields" style="display:none; flex-direction:column; gap:12px; margin-top:12px;">
+                    <div class="edit-vm-field">
+                        <label>VNC Password</label>
+                        <input type="text" id="sh-password" placeholder="websim2">
+                    </div>
+                    <label style="display:flex; align-items:center; gap:8px; font-size:12px; cursor:pointer;">
+                        <input type="checkbox" id="sh-manual-pw"> Manual Password Prompt
+                    </label>
+                    <div class="edit-vm-field">
+                        <label>Custom Rules (One per line)</label>
+                        <textarea id="sh-rules" style="min-height: 60px;"></textarea>
+                    </div>
+                    <div class="edit-vm-field">
+                        <label>Custom Entry Prompt</label>
+                        <input type="text" id="sh-prompt" placeholder="Message before entering">
+                    </div>
+                </div>
+            </div>
+
+            <div class="theme-actions" style="margin-top: 20px; display: flex; justify-content: space-between; align-items: center;">
+                <button id="sh-tutorial-btn" class="custom-popup-btn secondary" style="border-style: dashed;">Tutorial</button>
+                <div style="display:flex; gap:10px;">
+                    <button id="sh-cancel" class="custom-popup-btn secondary">Cancel</button>
+                    <button id="sh-submit" class="custom-popup-btn primary">Add Self-Hosted VM</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Self Host Tutorial Modal -->
+    <style>
+      .sh-tutorial-section {
+        margin-bottom: 24px;
+        background: rgba(255, 255, 255, 0.03);
+        border-radius: 8px;
+        border: 1px solid rgba(120, 150, 200, 0.1);
+        padding: 16px;
+      }
+      .sh-tutorial-section h4 {
+        color: #4fd3ff;
+        margin: 0 0 12px 0;
+        font-size: 16px;
+        text-transform: uppercase;
+        letter-spacing: 0.05em;
+        border-bottom: 1px solid rgba(79, 211, 255, 0.2);
+        padding-bottom: 6px;
+      }
+      .sh-tutorial-list {
+        margin: 0;
+        padding-left: 20px;
+        color: #dbe9ff;
+        font-size: 14px;
+      }
+      .sh-tutorial-list li {
+        margin-bottom: 8px;
+        line-height: 1.5;
+      }
+      .sh-tutorial-code {
+        display: block;
+        background: #000;
+        color: #48bb78;
+        padding: 10px;
+        border-radius: 4px;
+        font-family: monospace;
+        font-size: 13px;
+        margin: 8px 0;
+        border: 1px solid #1a2a1a;
+      }
+      .sh-tutorial-link {
+        color: #8fb3ff;
+        text-decoration: underline;
+      }
+      .sh-tutorial-link:hover {
+        color: #4fd3ff;
+      }
+      .sh-tutorial-note {
+        font-size: 13px;
+        background: rgba(255, 180, 0, 0.1);
+        border-left: 3px solid #ffd27a;
+        padding: 10px;
+        margin-top: 10px;
+        color: #ffd27a;
+      }
+    </style>
+    <div id="sh-tutorial-overlay" class="modal-overlay" style="display:none; position:fixed; inset:0; background:rgba(0,0,0,0.9); z-index:10100; align-items:center; justify-content:center; backdrop-filter:blur(10px);">
+        <div id="sh-tutorial-modal" class="theme-modal" style="width: 95%; max-width: 850px; max-height: 90vh; overflow-y: auto; padding: 30px;">
+            <h3 style="margin-bottom: 20px; font-size: 24px;">Self-Hosting Guide</h3>
+            
+            <div id="sh-tutorial-content">
+                
+                <div class="sh-tutorial-section">
+                    <h4>Requirements & Skills</h4>
+                    <ul class="sh-tutorial-list">
+                        <li>Computer with reliable high-speed internet access.</li>
+                        <li>Modern processor (Quad-core or better recommended).</li>
+                        <li>Large hard drive with at least 60–80 GB free per VM.</li>
+                        <li>16 GB RAM or more on the host system.
+                            <div style="font-size: 0.9em; opacity: 0.8; margin-top: 4px;">Note: Allocate 4 GB RAM to the VM. Allocating significantly more may cause lag depending on the host.</div>
+                        </li>
+                        <li><strong>Python 3</strong> installed and added to your system PATH.</li>
+                        <li><strong>Git for Windows</strong> (or Git for your OS) installed.</li>
+                        <li>Basic understanding of using a computer terminal (CMD, PowerShell, or Bash).</li>
+                    </ul>
+                </div>
+
+                <div class="sh-tutorial-section">
+                    <h4>Tunneling Software</h4>
+                    <p style="font-size: 14px; margin-bottom: 12px;">Install ONE of the following programs to expose your local VNC port to the internet:</p>
+                    <ul class="sh-tutorial-list">
+                        <li>
+                            <strong>Bore</strong>: Simple and efficient. 
+                            <a href="https://github.com/ekzhang/bore" target="_blank" class="sh-tutorial-link">GitHub Repo</a> | 
+                            <a href="https://github.com/ekzhang/bore#usage" target="_blank" class="sh-tutorial-link">Tutorial</a>
+                        </li>
+                        <li>
+                            <strong>Localtunnel</strong>: Node.js based. 
+                            <a href="https://github.com/localtunnel/localtunnel" target="_blank" class="sh-tutorial-link">GitHub Repo</a> | 
+                            <a href="https://github.com/localtunnel/localtunnel#readme" target="_blank" class="sh-tutorial-link">Tutorial</a>
+                        </li>
+                        <li>
+                            <strong>Serveo</strong>: SSH based, no installation required. 
+                            <a href="https://serveo.net" target="_blank" class="sh-tutorial-link">Website</a> | 
+                            <a href="https://serveo.net/#instructions" target="_blank" class="sh-tutorial-link">Instructions</a>
+                        </li>
+                    </ul>
+                </div>
+
+                <div class="sh-tutorial-section">
+                    <h4>Software & Images</h4>
+                    <ul class="sh-tutorial-list">
+                        <li>
+                            <strong>Virtualization</strong>: VMware Workstation is required.
+                            <br><a href="https://dl.malwarewatch.org/software/useful/vmware/VMwareWorkstation17.5.7z" target="_blank" class="sh-tutorial-link">Download VMware Workstation 17.5</a>
+                        </li>
+                        <li>
+                            <strong>Operating Systems</strong>: Download Windows ISO images.
+                            <br><a href="https://dl.malwarewatch.org/windows/" target="_blank" class="sh-tutorial-link">MalwareWatch Windows ISOs</a>
+                        </li>
+                        <li>
+                            <strong>VMware Tools</strong>: Essential for drivers and performance.
+                            <ul style="margin-top: 5px; font-size: 13px; opacity: 0.9;">
+                                <li>Windows (Modern): <a href="https://archive.org/download/vmware-tools-collection/vmware-tools-655-win.iso" target="_blank" class="sh-tutorial-link">v6.5.5 ISO</a></li>
+                                <li>Windows (Pre-2000): <a href="https://archive.org/download/vmware-tools-collection/vmware-tools-653-winpre2k.iso" target="_blank" class="sh-tutorial-link">v6.5.3 ISO</a></li>
+                                <li>Linux: <a href="https://archive.org/download/vmware-tools-collection/vmware-tools-604-linux.iso" target="_blank" class="sh-tutorial-link">v6.0.4 ISO</a></li>
+                                <li>Solaris: <a href="https://archive.org/download/vmware-tools-collection/vmware-tools-604-solaris.iso" target="_blank" class="sh-tutorial-link">v6.0.4 ISO</a></li>
+                                <li>Netware: <a href="https://archive.org/download/vmware-tools-collection/vmware-tools-604-netware.iso" target="_blank" class="sh-tutorial-link">v6.0.4 ISO</a></li>
+                                <li>FreeBSD: <a href="https://archive.org/download/vmware-tools-collection/vmware-tools-604-freebsd.iso" target="_blank" class="sh-tutorial-link">v6.0.4 ISO</a></li>
+                            </ul>
+                        </li>
+                    </ul>
+                    <div class="sh-tutorial-note">
+                        Versions below NT 4.0 may be difficult to install. Windows 7, Windows XP, and Windows 10 are highly recommended for stability.
+                    </div>
+                </div>
+
+                <div class="sh-tutorial-section">
+                    <h4>VMware Setup Steps</h4>
+                    <ol class="sh-tutorial-list">
+                        <li>Open VMware Workstation and create a new virtual machine.</li>
+                        <li>Select <strong>Typical Configuration</strong>.</li>
+                        <li>Choose <strong>Installer disc image file (iso)</strong> and select your downloaded Windows ISO.</li>
+                        <li>Ensure <strong>Guest Operating System</strong> is set to Microsoft Windows and matches your ISO version.</li>
+                        <li>Name the VM clearly (e.g., "Windows XP", "Windows 10").</li>
+                        <li>Store the VM in a location with sufficient free space.</li>
+                    </ol>
+                </div>
+
+                <div class="sh-tutorial-section">
+                    <h4>Hardware Configuration</h4>
+                    <ul class="sh-tutorial-list">
+                        <li><strong>Memory</strong>: Set to 4096 MB for modern Windows (1024-2048 MB for XP).</li>
+                        <li><strong>Processors</strong>: Set to 2 cores.</li>
+                        <li><strong>Hard Disk</strong>: At least 60 GB for Windows XP and newer.</li>
+                        <li><strong>Network Mode</strong>: Must be set to <strong>NAT</strong>.</li>
+                    </ul>
+                </div>
+
+                <div class="sh-tutorial-section">
+                    <h4>OS Specific Guidance</h4>
+                    <div style="display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 10px;">
+                        <div style="background: rgba(0,0,0,0.2); padding: 10px; border-radius: 4px;">
+                            <strong style="color: #ffd27a;">Windows 98</strong><br>
+                            <span style="font-size: 12px; opacity: 0.8;">256–512 MB RAM. Small disks (2-8 GB). Expect driver/display limits.</span>
+                        </div>
+                        <div style="background: rgba(0,0,0,0.2); padding: 10px; border-radius: 4px;">
+                            <strong style="color: #ffd27a;">Windows XP</strong><br>
+                            <span style="font-size: 12px; opacity: 0.8;">1024–2048 MB RAM. 20–40 GB disk. Very stable for VNC access.</span>
+                        </div>
+                        <div style="background: rgba(0,0,0,0.2); padding: 10px; border-radius: 4px;">
+                            <strong style="color: #ffd27a;">Windows 10</strong><br>
+                            <span style="font-size: 12px; opacity: 0.8;">4096 MB RAM. 60+ GB disk. 2 CPU cores minimum. Best compatibility.</span>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="sh-tutorial-section">
+                    <h4>Enable VNC Access</h4>
+                    <ol class="sh-tutorial-list">
+                        <li>Power off the VM.</li>
+                        <li>Open <strong>VM Settings</strong> > <strong>Options</strong> > <strong>VNC Connections</strong>.</li>
+                        <li>Enable VNC access and set a strong password.</li>
+                        <li>Note your local VNC port (commonly <strong>5900</strong>).</li>
+                    </ol>
+                    <p style="font-size: 12px; margin-top: 8px; opacity: 0.7;">Example local endpoint: <code>localhost:5900</code></p>
+                </div>
+
+                <div class="sh-tutorial-section">
+                    <h4>Websockify and noVNC Requirement</h4>
+                    <p style="font-size: 14px; margin-bottom: 12px; color: #ffd27a;"><strong>Mandatory for Browser Access:</strong></p>
+                    <p style="font-size: 14px; margin-bottom: 12px;">VNC is a raw TCP protocol and browsers cannot connect to it directly. The self hosting system expects a websocket endpoint (wss://). Therefore, websockify or noVNC must be used to convert VNC traffic into websocket traffic before exposing it through a tunnel. Tunneling tools do not perform protocol conversion.</p>
+                    
+                    <p style="font-size: 13px; color: #4fd3ff; margin-bottom: 8px;"><strong>Correct Data Flow:</strong></p>
+                    <div style="background: rgba(0,0,0,0.3); padding: 10px; border-radius: 4px; font-size: 13px; font-family: monospace; line-height: 1.6;">
+                        1. VMware VNC Server (TCP 5900)<br>
+                        2. Websockify / noVNC Websocket Server (e.g., TCP 6080)<br>
+                        3. Tunneling Program (bore, localtunnel, serveo)<br>
+                        4. Browser Client using wss://
+                    </div>
+                    <p style="font-size: 13px; margin-top: 10px;">The tunnel must expose the websockify or noVNC port (6080), not the raw VNC port (5900).</p>
+                </div>
+
+                <div class="sh-tutorial-section">
+                    <h4>Windows Websockify / noVNC Setup</h4>
+                    <ol class="sh-tutorial-list">
+                        <li>Install <a href="https://git-scm.com/download/win" target="_blank" class="sh-tutorial-link">Git for Windows</a>.</li>
+                        <li>Clone the noVNC repository:
+                            <code class="sh-tutorial-code">git clone https://github.com/novnc/noVNC</code>
+                        </li>
+                        <li>Install <a href="https://www.python.org/downloads/windows/" target="_blank" class="sh-tutorial-link">Python 3</a> and ensure it is added to your PATH.</li>
+                        <li>From the noVNC directory, run websockify pointing to the local VNC server:
+                            <code class="sh-tutorial-code">python utils/websockify/run.py 6080 localhost:5900</code>
+                        </li>
+                        <li>Confirm that noVNC is listening on <code>localhost:6080</code> and serving a websocket endpoint.</li>
+                    </ol>
+                </div>
+
+                <div class="sh-tutorial-section">
+                    <h4>Linux Websockify / noVNC Setup</h4>
+                    <ol class="sh-tutorial-list">
+                        <li>Install dependencies using the system package manager (python3, git).</li>
+                        <li>Clone the noVNC repository:
+                            <code class="sh-tutorial-code">git clone https://github.com/novnc/noVNC</code>
+                        </li>
+                        <li>Run websockify:
+                            <code class="sh-tutorial-code">./utils/websockify/run 6080 localhost:5900</code>
+                        </li>
+                        <li>Confirm that the websocket server is active on port <code>6080</code>.</li>
+                    </ol>
+                </div>
+
+                <div class="sh-tutorial-section">
+                    <h4>3. Tunnel the WebSocket Port (6080)</h4>
+                    <p style="font-size: 14px; color: #ffb4a8; font-weight: bold; margin-bottom: 10px;">⚠️ IMPORTANT: You must tunnel port 6080, NOT 5900.</p>
+                    <p style="font-size: 14px;">Run one of these commands to create your public link:</p>
+                    <div style="margin-top: 10px;">
+                        <strong>Bore:</strong>
+                        <code class="sh-tutorial-code">bore local 6080</code>
+                        <strong>Localtunnel:</strong>
+                        <code class="sh-tutorial-code">lt --port 6080</code>
+                        <strong>Serveo:</strong>
+                        <code class="sh-tutorial-code">ssh -R 80:localhost:6080 serveo.net</code>
+                    </div>
+                    <div class="sh-tutorial-note" style="border-color: #4fd3ff; background: rgba(79,211,255,0.05); color: #bfe7ff;">
+                        The command will output a public URL (e.g. <code>wss://random.localtunnel.me</code>). This is your <strong>VNC Endpoint</strong>.
+                    </div>
+                </div>
+
+                <div class="sh-tutorial-section" style="border-color: #48bb78; background: rgba(72,187,120,0.05);">
+                    <h4>Operational Requirement</h4>
+                    <p style="font-size: 14px; color: #48bb78; font-weight: bold;">
+                        VMware, Websockify, and your Tunnel MUST all be running at the same time for the VM to work!
+                    </p>
+                </div>
+
+                <div class="sh-tutorial-section">
+                    <h4>Finalizing on VMsHARE</h4>
+                    <p style="font-size: 14px;">Fill out the Self-Host modal as follows:</p>
+                    <div style="background: rgba(0,0,0,0.3); padding: 15px; border-radius: 6px; font-size: 13px;">
+                        <div><strong>VM Name:</strong> Windows 10</div>
+                        <div><strong>Path (Slug):</strong> /windows10selfhost</div>
+                        <div><strong>Location:</strong> <code>wss://YOUR_TUNNEL_URL/windows10selfhost</code></div>
+                        <div style="margin-left: 20px; font-size: 11px; opacity: 0.7;">Replace <code>YOUR_TUNNEL_URL</code> with the output from your tunnel program.</div>
+                        <div><strong>Icon URL:</strong> https://windows.com/windows10.png</div>
+                        <div><strong>Categories:</strong> windows</div>
+                        <div><strong>Description:</strong> A Windows 10 machine.</div>
+                        <div style="margin-top:10px; font-size:12px; color:#ffd27a;">
+                          Note: The VMware Workstation 7z archive used in this tutorial is password-protected; the password is "mysubsarethebest".
+                        </div>
+                    </div>
+                </div>
+
+                <div class="sh-tutorial-section">
+                    <h4>Operational Notes</h4>
+                    <ul class="sh-tutorial-list">
+                        <li>VMware and your tunneling program must remain running at all times.</li>
+                        <li>Free tunnels are usually not persistent and will change URLs when restarted.</li>
+                        <li>Performance depends heavily on your host hardware and network upload speed.</li>
+                    </ul>
+                </div>
+
+            </div>
+
+            <div class="theme-actions" style="margin-top: 20px;">
+                <button id="sh-tutorial-close" class="custom-popup-btn primary">I Understand</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Mod Kick Popup -->
+    <div id="mod-kick-popup-overlay" class="mod-overlay" style="display:none; position:fixed; inset:0; background:rgba(0,0,0,0.8); z-index:10080; align-items:center; justify-content:center; backdrop-filter:blur(6px);">
+        <div class="theme-modal" style="width:320px; border-color:#ffd27a;">
+            <h3 style="color:#ffd27a; margin-top:0;">Kick User</h3>
+            <div id="mod-kick-userinfo" style="font-size:11px; margin-bottom:10px; color:#add8e6;"></div>
+            <div style="display:flex; flex-direction:column; gap:8px;">
+                <button id="mod-kick-action-user" class="custom-popup-btn primary" style="background:#e67e22;">Kick User (Session)</button>
+                <button id="mod-kick-action-ip" class="custom-popup-btn secondary">Kick IP Address</button>
+                <button id="mod-kick-action-path" class="custom-popup-btn secondary">Kick Current VM Path</button>
+            </div>
+            <div class="theme-actions" style="margin-top:15px;">
+                <button class="mod-popup-cancel custom-popup-btn secondary">Cancel</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Mod Ban Popup -->
+    <div id="mod-ban-popup-overlay" class="mod-overlay" style="display:none; position:fixed; inset:0; background:rgba(0,0,0,0.8); z-index:10080; align-items:center; justify-content:center; backdrop-filter:blur(6px);">
+        <div class="theme-modal" style="width:380px; border-color:#ff6b6b;">
+            <h3 style="color:#ff6b6b; margin-top:0;">Ban Management</h3>
+            <div id="mod-ban-userinfo" style="font-size:11px; margin-bottom:10px; color:#add8e6;"></div>
+            
+            <div style="display:flex; flex-direction:column; gap:12px;">
+                <div style="display:flex; gap:10px; flex-wrap:wrap;">
+                    <label style="display:flex; align-items:center; gap:5px; font-size:12px;"><input type="checkbox" id="mod-ban-check-banned"> Banned</label>
+                    <label style="display:flex; align-items:center; gap:5px; font-size:12px;"><input type="checkbox" id="mod-ban-check-sitebanned"> Sitebanned</label>
+                    <label style="display:flex; align-items:center; gap:5px; font-size:12px;"><input type="checkbox" id="mod-ban-check-dnb"> DNB (White)</label>
+                    <label style="display:flex; align-items:center; gap:5px; font-size:12px; color:#ffd27a;"><input type="checkbox" id="mod-ban-check-assoc-ips"> Ban Assoc. IPs</label>
+                </div>
+                
+                <div class="edit-vm-field">
+                    <label>Reason</label>
+                    <input type="text" id="mod-ban-input-reason" placeholder="Rule violation">
+                </div>
+                <div class="edit-vm-field">
+                    <label>Duration (1d, 1h, or Date)</label>
+                    <input type="text" id="mod-ban-input-duration" placeholder="Leave empty for permanent">
+                </div>
+
+                <div id="mod-ban-ip-section" style="border-top:1px solid rgba(255,255,255,0.1); padding-top:8px;">
+                    <div style="font-size:10px; color:#a0aec0; font-weight:bold; margin-bottom:5px;">Toggle IP Bans:</div>
+                    <div id="mod-ban-ip-list" style="max-height:80px; overflow-y:auto; background:rgba(0,0,0,0.2); border-radius:4px; padding:4px;"></div>
+                </div>
+            </div>
+
+            <div class="theme-actions" style="margin-top:15px;">
+                <button class="mod-popup-cancel custom-popup-btn secondary">Cancel</button>
+                <button id="mod-ban-save" class="custom-popup-btn primary" style="background:#ff6b6b; color:#fff;">Save Changes</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Mod Blacklist Popup -->
+    <div id="mod-blacklist-popup-overlay" class="mod-overlay" style="display:none; position:fixed; inset:0; background:rgba(0,0,0,0.8); z-index:10080; align-items:center; justify-content:center; backdrop-filter:blur(6px);">
+        <div class="theme-modal" style="width:400px; border-color:#8fb3ff;">
+            <h3 style="color:#8fb3ff; margin-top:0;">VM Blacklist Manager</h3>
+            <div id="mod-blacklist-userinfo" style="font-size:11px; margin-bottom:10px; color:#add8e6;"></div>
+            <p style="font-size:11px; opacity:0.7; margin-bottom:10px;">Select VMs to block this user from entering:</p>
+            
+            <div id="mod-blacklist-vms" style="max-height:250px; overflow-y:auto; background:rgba(0,0,0,0.2); border:1px solid rgba(255,255,255,0.1); border-radius:6px; padding:8px; display:grid; grid-template-columns:1fr 1fr; gap:8px;">
+                <!-- VM Checkboxes populated dynamically -->
+            </div>
+
+            <div class="theme-actions" style="margin-top:15px;">
+                <button class="mod-popup-cancel custom-popup-btn secondary">Cancel</button>
+                <button id="mod-blacklist-save" class="custom-popup-btn primary" style="background:#8fb3ff; color:#0b0f18;">Update Blacklist</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Mod Tags Popup -->
+    <div id="mod-tags-popup-overlay" class="mod-overlay" style="display:none; position:fixed; inset:0; background:rgba(0,0,0,0.8); z-index:10080; align-items:center; justify-content:center; backdrop-filter:blur(6px);">
+        <div class="theme-modal" style="width:400px; border-color:#8fb3ff; max-height:90vh; overflow-y:auto;">
+            <h3 style="color:#8fb3ff; margin-top:0;">User Tags</h3>
+            <div id="mod-tags-popup-userinfo" style="font-size:11px; margin-bottom:10px; color:#add8e6;"></div>
+            
+            <div id="mod-tags-popup-list" style="max-height:180px; overflow-y:auto; background:rgba(0,0,0,0.2); border:1px solid rgba(255,255,255,0.1); border-radius:6px; padding:6px; margin-bottom:12px;">
+                <!-- Tags listed here -->
+            </div>
+
+            <div style="border-top:1px solid rgba(255,255,255,0.1); padding-top:10px; display:flex; flex-direction:column; gap:8px;">
+                <div style="font-size:12px; font-weight:bold; color:#bfe7ff; display:flex; justify-content:space-between;">
+                    <span id="mod-tags-popup-editor-title">Add New Tag</span>
+                    <button id="mod-tags-popup-clear-btn" style="background:none; border:none; color:#a0aec0; cursor:pointer; font-size:10px; text-decoration:underline;">New</button>
+                </div>
+                <div style="display:grid; grid-template-columns:1fr 1fr; gap:8px;">
+                    <div class="edit-vm-field"><label>Tag ID</label><input type="text" id="mod-tags-popup-id" placeholder="e.g. vip"></div>
+                    <div class="edit-vm-field"><label>Name</label><input type="text" id="mod-tags-popup-name" placeholder="Display Name"></div>
+                </div>
+                <div class="edit-vm-field"><label>Badge CSS</label><input type="text" id="mod-tags-popup-css" placeholder="e.g. background:gold; color:black;"></div>
+                <div style="display:grid; grid-template-columns:1fr 1fr; gap:8px;">
+                    <div class="edit-vm-field"><label>Chat CSS (Others)</label><input type="text" id="mod-tags-popup-chat-css" placeholder="e.g. font-weight:bold;"></div>
+                    <div class="edit-vm-field"><label>Own Chat CSS</label><input type="text" id="mod-tags-popup-own-chat-css" placeholder="e.g. border:2px solid cyan;"></div>
+                </div>
+
+                <div style="display:grid; grid-template-columns:1fr 1fr; gap:4px; font-size:11px; margin-top:4px; color:#cbd5e0;">
+                    <label style="display:flex; align-items:center; gap:4px;"><input type="checkbox" id="mod-tags-popup-perm-mod"> Mod</label>
+                    <label style="display:flex; align-items:center; gap:4px;"><input type="checkbox" id="mod-tags-popup-perm-ann"> Global Announce</label>
+                    <label style="display:flex; align-items:center; gap:4px;"><input type="checkbox" id="mod-tags-popup-perm-room-ann"> Room Announce</label>
+                    <label style="display:flex; align-items:center; gap:4px;"><input type="checkbox" id="mod-tags-popup-perm-xss"> XSS (innerHTML)</label>
+                    <label style="display:flex; align-items:center; gap:4px;"><input type="checkbox" id="mod-tags-popup-perm-bot"> Can Bot</label>
+                    <label style="display:flex; align-items:center; gap:4px;"><input type="checkbox" id="mod-tags-popup-perm-chat" checked> Allow Chat</label>
+                    <label style="display:flex; align-items:center; gap:4px;"><input type="checkbox" id="mod-tags-popup-perm-image" checked> Allow Images</label>
+                    <label style="display:flex; align-items:center; gap:4px;"><input type="checkbox" id="mod-tags-popup-perm-nxss"> Name XSS</label>
+                    <label style="display:flex; align-items:center; gap:4px;"><input type="checkbox" id="mod-tags-popup-perm-hidden"> Hidden</label>
+                </div>
+
+                <div style="display:flex; align-items:center; gap:8px; margin-top:4px;">
+                    <label style="font-size:11px; color:#a0aec0;">Ratelimit (ms):</label>
+                    <input type="number" id="mod-tags-popup-ratelimit" placeholder="3000" style="width:70px; background:#0a0e1a; border:1px solid rgba(120,150,200,0.3); color:#fff; border-radius:4px; padding:4px; font-size:11px;">
+                </div>
+            </div>
+
+            <div class="theme-actions" style="margin-top:15px;">
+                <button class="mod-popup-cancel custom-popup-btn secondary">Cancel</button>
+                <button id="mod-tags-popup-save" class="custom-popup-btn primary" style="background:#8fb3ff; color:#0b0f18;">Save Tag</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Mod Attributes Popup -->
+    <div id="mod-attributes-popup-overlay" class="mod-overlay" style="display:none; position:fixed; inset:0; background:rgba(0,0,0,0.8); z-index:10080; align-items:center; justify-content:center; backdrop-filter:blur(6px);">
+        <div class="theme-modal" style="width:320px; border-color:#4fd3ff;">
+            <h3 style="color:#4fd3ff; margin-top:0;">Set Attributes</h3>
+            <div id="mod-attributes-userinfo" style="font-size:11px; margin-bottom:10px; color:#add8e6;"></div>
+            
+            <div style="display:flex; flex-direction:column; gap:12px;">
+                <div class="edit-vm-field">
+                    <label>Field Name</label>
+                    <input type="text" id="mod-attr-input-field" placeholder="e.g. rank">
+                </div>
+                <div class="edit-vm-field">
+                    <label>Value</label>
+                    <input type="text" id="mod-attr-input-value" placeholder="e.g. vip">
+                </div>
+            </div>
+
+            <div class="theme-actions" style="margin-top:15px;">
+                <button class="mod-popup-cancel custom-popup-btn secondary">Cancel</button>
+                <button id="mod-attributes-save" class="custom-popup-btn primary" style="background:#4fd3ff; color:#0b0f18;">Set Attribute</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Edit VM Modal -->
+    <div id="edit-vm-overlay">
+      <div id="edit-vm-modal" style="max-width: 600px; max-height: 90vh; overflow-y: auto;">
+        <h3 style="margin:0; color:#bfe7ff;">Edit VM Configuration</h3>
+        
+        <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 16px;">
+          <div class="edit-vm-field">
+            <label>VM Name</label>
+            <input type="text" id="edit-vm-name" placeholder="e.g. Windows XP">
+          </div>
+          <div class="edit-vm-field" id="edit-vm-path-field">
+            <label>Internal Path</label>
+            <input type="text" id="edit-vm-target-path" placeholder="/my-vm">
+          </div>
+        </div>
+
+        <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 16px;">
+          <div class="edit-vm-field">
+            <label>VNC IP / Host</label>
+            <input type="text" id="edit-vm-ip" placeholder="127.0.0.1">
+          </div>
+          <div class="edit-vm-field">
+            <label>VNC Port</label>
+            <input type="number" id="edit-vm-port" placeholder="5900">
+          </div>
+        </div>
+
+        <div class="edit-vm-field">
+          <label>Icon URL</label>
+          <input type="text" id="edit-vm-icon" placeholder="URL to icon image">
+        </div>
+
+        <div class="edit-vm-field">
+            <label>Thumbnail URL (Optional)</label>
+            <input type="text" id="edit-vm-thumbnail" placeholder="Custom preview image URL">
+        </div>
+
+        <div class="edit-vm-field">
+          <label>Description</label>
+          <textarea id="edit-vm-desc" style="min-height: 60px;" placeholder="Brief summary of the VM..."></textarea>
+        </div>
+
+        <div style="display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 10px; background: rgba(0,0,0,0.2); padding: 12px; border-radius: 8px;">
+            <label style="display: flex; align-items: center; gap: 8px; font-size: 12px; cursor: pointer;">
+                <input type="checkbox" id="edit-vm-online"> Online
+            </label>
+            <label style="display: flex; align-items: center; gap: 8px; font-size: 12px; cursor: pointer;">
+                <input type="checkbox" id="edit-vm-private"> Private
+            </label>
+            <label style="display: flex; align-items: center; gap: 8px; font-size: 12px; cursor: pointer;">
+                <input type="checkbox" id="edit-vm-hidden"> Hidden
+            </label>
+            <label style="display: flex; align-items: center; gap: 8px; font-size: 12px; cursor: pointer;">
+                <input type="checkbox" id="edit-vm-sponsored"> Sponsored
+            </label>
+            <label style="display: flex; align-items: center; gap: 8px; font-size: 12px; cursor: pointer;">
+                <input type="checkbox" id="edit-vm-always-rules"> Always Rules
+            </label>
+            <label style="display: flex; align-items: center; gap: 8px; font-size: 12px; cursor: pointer;">
+                <input type="checkbox" id="edit-vm-manual-pw"> Manual PW
+            </label>
+            <label style="display: flex; align-items: center; gap: 8px; font-size: 12px; cursor: pointer;">
+                <input type="checkbox" id="edit-vm-websocket"> Websocket VNC
+            </label>
+            <label style="display: flex; align-items: center; gap: 8px; font-size: 12px; cursor: pointer;">
+                <input type="checkbox" id="edit-vm-is-private-server"> Private Server
+            </label>
+        </div>
+
+        <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 16px;">
+          <div class="edit-vm-field">
+            <label>Password (Internal)</label>
+            <input type="text" id="edit-vm-password" placeholder="websim2">
+          </div>
+          <div class="edit-vm-field">
+            <label>Rules Timeout (e.g. 1d, 1h)</label>
+            <input type="text" id="edit-vm-rules-timeout" placeholder="1d">
+          </div>
+        </div>
+
+        <div class="edit-vm-field">
+            <label>API Token (Extras)</label>
+            <input type="text" id="edit-vm-api-token" placeholder="Internal API Token for requests">
+        </div>
+
+        <div class="edit-vm-field">
+            <label>Embed URL (If this is an iframe VM)</label>
+            <input type="text" id="edit-vm-embed" placeholder="https://...">
+        </div>
+
+        <div class="edit-vm-field">
+            <label>Rules Prompt Title</label>
+            <input type="text" id="edit-vm-prompt" placeholder="Custom message at top of rules">
+        </div>
+
+        <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 16px;">
+          <div class="edit-vm-field">
+            <label>Main Category</label>
+            <select id="edit-vm-main-cat" style="background: #0a0e1a; border: 1px solid rgba(120,150,200,0.3); border-radius: 6px; padding: 10px; color: #fff; outline: none;">
+                <option value="">None</option>
+                <option value="windows">Windows</option>
+                <option value="mac">Mac</option>
+                <option value="linux">Linux</option>
+                <option value="site">Site</option>
+            </select>
+          </div>
+          <div class="edit-vm-field">
+            <label>Extra Categories</label>
+            <input type="text" id="edit-vm-extra-cats" placeholder="comma, separated, list">
+          </div>
+        </div>
+
+        <div class="edit-vm-field">
+            <label>Rules (One per line)</label>
+            <textarea id="edit-vm-rules" style="min-height: 60px;" placeholder="1. Be nice&#10;2. No malware"></textarea>
+        </div>
+
+        <div style="margin-top: 10px; border-top: 1px solid rgba(255,255,255,0.1); padding-top: 10px;">
+            <label style="font-size: 12px; font-weight: 700; color: #8fb3ff; text-transform: uppercase; letter-spacing: 0.05em; margin-bottom: 6px; display: block;">VM Controls (Custom Buttons)</label>
+            <div id="edit-vm-controls-list" style="display: flex; flex-direction: column; gap: 8px; margin-bottom: 10px;"></div>
+            <button id="add-vm-control-btn" class="custom-popup-btn secondary" style="width: 100%; font-size: 11px; border-style: dashed;">+ Add Action Button</button>
+        </div>
+
+        <div style="margin-top: 8px; padding-top: 8px; border-top: 1px solid rgba(255,255,255,0.1);">
+            <button id="toggle-advanced-extras" style="background:none; border:none; color:#8fb3ff; cursor:pointer; font-size:11px; padding:0; text-decoration:underline;">Toggle Advanced JSON</button>
+            <div id="advanced-extras-container" style="display:none; margin-top:10px;" class="edit-vm-field">
+                <label>Raw Extras JSON</label>
+                <textarea id="edit-vm-extras" placeholder='{ ... }'></textarea>
+            </div>
+        </div>
+
+        <div style="display:flex; justify-content:flex-end; gap:10px; margin-top:8px;">
+          <button id="edit-vm-cancel" class="custom-popup-btn secondary">Cancel</button>
+          <button id="edit-vm-save" class="custom-popup-btn primary">Save Changes</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- Profile Popup -->
+    <div id="profile-popup-overlay">
+      <div id="profile-popup-modal">
+        <button id="profile-popup-close">&times;</button>
+        <img id="profile-popup-avatar" src="" alt="avatar">
+        <h3 id="profile-popup-nickname"></h3>
+        <div id="profile-popup-username"></div>
+        <p id="profile-popup-bio"></p>
+        <h4>Roles</h4>
+        <div id="profile-popup-roles"></div>
+        <!-- Edit controls -->
+        <div id="profile-edit-controls" style="display: none; margin-top: 15px; width: 100%; text-align: left;">
+          <label style="display: block; margin-bottom: 8px;">
+            <span style="font-size: 13px; font-weight: 600; color: #cde4ff;">Nickname</span>
+            <input type="text" id="profile-edit-nickname" maxlength="20" style="width: 100%; box-sizing: border-box; background: #0f1524; color: #dbe9ff; border: 1px solid rgba(120,150,200,0.25); border-radius: 6px; padding: 6px 8px; font-size: 13px; outline: none; margin-top: 4px;">
+          </label>
+          <label style="display: block; margin-bottom: 8px;">
+            <span style="font-size: 13px; font-weight: 600; color: #cde4ff;">Bio</span>
+            <textarea id="profile-edit-bio" maxlength="120" rows="3" style="width: 100%; box-sizing: border-box; background: #0f1524; color: #dbe9ff; border: 1px solid rgba(120,150,200,0.25); border-radius: 6px; padding: 6px 8px; font-size: 13px; outline: none; resize: vertical; margin-top: 4px;"></textarea>
+          </label>
+          <label style="display: block; margin-bottom: 8px;">
+            <span style="font-size: 13px; font-weight: 600; color: #cde4ff;">Custom Tag (Max 10 chars)</span>
+            <div style="display: flex; gap: 8px; margin-top: 4px;">
+                <input type="text" id="profile-edit-tag-text" maxlength="10" placeholder="Tag Text" style="flex: 1; box-sizing: border-box; background: #0f1524; color: #dbe9ff; border: 1px solid rgba(120,150,200,0.25); border-radius: 6px; padding: 6px 8px; font-size: 13px; outline: none;">
+                <input type="color" id="profile-edit-tag-bg" value="#333333" title="Background Color" style="height: 30px; width: 30px; border: none; padding: 0; background: none; cursor: pointer;">
+                <input type="color" id="profile-edit-tag-color" value="#ffffff" title="Text Color" style="height: 30px; width: 30px; border: none; padding: 0; background: none; cursor: pointer;">
+            </div>
+            <div style="display: flex; gap: 12px; margin-top: 8px; align-items: center; flex-wrap: wrap;">
+                <div style="display:flex; align-items:center; gap:4px;">
+                    <span style="font-size: 12px; color: #8fb3ff;">Pad:</span>
+                    <input type="number" id="profile-edit-tag-padding" min="0" max="5" value="1" style="width: 36px; background: #0f1524; color: #dbe9ff; border: 1px solid rgba(120,150,200,0.25); border-radius: 4px; padding: 4px; outline: none;">
+                </div>
+                <div style="display:flex; align-items:center; gap:4px;">
+                    <span style="font-size: 12px; color: #8fb3ff;">Size:</span>
+                    <input type="number" id="profile-edit-tag-size" min="8" max="14" value="10" style="width: 36px; background: #0f1524; color: #dbe9ff; border: 1px solid rgba(120,150,200,0.25); border-radius: 4px; padding: 4px; outline: none;">
+                </div>
+                <div style="display:flex; align-items:center; gap:4px;">
+                    <label style="font-size: 12px; display:flex; align-items:center; gap:4px; cursor:pointer; color: #8fb3ff; user-select:none;">
+                        <input type="checkbox" id="profile-edit-tag-has-shadow" style="margin:0; cursor:pointer;"> Shadow
+                    </label>
+                    <input type="color" id="profile-edit-tag-shadow" value="#000000" title="Shadow Color" style="height: 24px; width: 24px; border: none; padding: 0; background: none; cursor: pointer;">
+                    <select id="profile-edit-tag-mode" title="Mode" style="width: 52px; background: #0f1524; color: #dbe9ff; border: 1px solid rgba(120,150,200,0.25); border-radius: 4px; padding: 0 2px; height: 24px; font-size: 11px; outline:none;">
+                        <option value="drop">Drop</option>
+                        <option value="glow">Glow</option>
+                        <option value="retro">Retro</option>
+                    </select>
+                    <select id="profile-edit-tag-intensity" title="Intensity" style="width: 36px; background: #0f1524; color: #dbe9ff; border: 1px solid rgba(120,150,200,0.25); border-radius: 4px; padding: 0 2px; height: 24px; font-size: 11px; outline:none;">
+                        <option value="1">1</option>
+                        <option value="2">2</option>
+                        <option value="3">3</option>
+                        <option value="4">4</option>
+                        <option value="5">5</option>
+                        <option value="6">6</option>
+                        <option value="7">7</option>
+                        <option value="8">8</option>
+                        <option value="9">9</option>
+                        <option value="10">10</option>
+                    </select>
+                    <select id="profile-edit-tag-font" title="Font" style="width: 80px; background: #0f1524; color: #dbe9ff; border: 1px solid rgba(120,150,200,0.25); border-radius: 4px; padding: 0 2px; height: 24px; font-size: 11px; outline:none;">
+                        <option value="0">Def</option>
+                        <option value="1">Serif</option>
+                        <option value="2">Mono</option>
+                        <option value="3">Comic Sans</option>
+                        <option value="4">Bold</option>
+                        <option value="5">Script</option>
+                        <option value="6">Papyrus</option>
+                        <option value="7">Wingdings</option>
+                    </select>
+                </div>
+            </div>
+          </label>
+          <button id="profile-save-edit-btn" class="custom-popup-btn primary" style="margin-top: 8px;">Save Changes</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- Create Theme Modal -->
+    <div id="create-theme-overlay" style="display:none; position:fixed; inset:0; background:rgba(0,0,0,0.75); z-index:10050; align-items:center; justify-content:center; backdrop-filter:blur(6px);">
+      <div class="theme-modal" style="width: 98vw; max-width: 4200px; height: 96vh; display: flex; flex-direction: row; gap: 18px; padding: 22px; box-sizing: border-box; max-height: 96vh; overflow: hidden;">
+        
+        <!-- History Column -->
+        <div style="width: 250px; display: flex; flex-direction: column; min-width: 220px; border-right: 1px solid rgba(120,150,200,0.15); padding-right: 16px; margin-right: -16px;">
+            <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:10px;">
+                <h3 style="margin:0; font-size:16px; color:#bfe7ff;">Versions</h3>
+                <button id="theme-history-clear" title="Clear History" style="background:none; border:none; color:#ff6b6b; cursor:pointer; font-size:11px; opacity:0.7;">Clear All</button>
+            </div>
+            <div id="theme-history-list" style="flex: 1; overflow-y: auto; display: flex; flex-direction: column; gap: 8px; padding-right: 8px;">
+                <!-- History items injected here -->
+            </div>
+        </div>
+
+        <!-- Editor Column -->
+        <div style="flex: 1; display: flex; flex-direction: column; min-width: 320px; padding-left: 16px;">
+            <h3 id="create-theme-modal-title">Create Custom Theme</h3>
+            <input type="text" id="create-theme-name" placeholder="Theme Name" maxlength="30" class="theme-input" style="margin-bottom:8px;">
+            
+            <div style="display:flex; gap:8px; margin-bottom:8px;">
+                <select id="create-theme-ai-model" class="theme-input" style="width: auto; min-width: 120px; font-size: 11px; padding: 6px;">
+                    <option value="gpt-4o">GPT-4o</option>
+                    <option value="claude-3-5-sonnet-20240620">Claude 3.5 Sonnet</option>
+                    <option value="gpt-4o-mini">GPT-4o Mini</option>
+                </select>
+                <input type="text" id="create-theme-ai-prompt" placeholder="AI Prompt (e.g. 'neon cyberpunk red')" class="theme-input" style="flex:1;">
+                <button id="create-theme-ai-btn" class="custom-popup-btn secondary" style="white-space:nowrap; padding: 10px;">✨ AI</button>
+            </div>
+
+            <textarea id="create-theme-css" placeholder="Enter CSS here... e.g. body { background: #330000; }" class="theme-input" style="flex: 1; font-family: monospace; resize: none;"></textarea>
+            <div class="theme-actions" style="margin-top: 12px;">
+              <button id="create-theme-cancel" class="custom-popup-btn secondary">Cancel</button>
+              <button id="create-theme-save" class="custom-popup-btn primary">Save & Upload</button>
+            </div>
+        </div>
+
+        <!-- Preview Column -->
+        <div style="flex: 1.2; display: flex; flex-direction: column; background: #000; border-radius: 8px; border: 1px solid rgba(120,150,200,0.2); overflow: hidden;">
+            <div style="padding: 8px 12px; background: rgba(255,255,255,0.05); border-bottom: 1px solid rgba(120,150,200,0.1); font-size: 12px; font-weight: bold; color: #aaa;">
+                Live Preview (Isolated)
+            </div>
+            <div id="theme-preview-container" style="flex: 1; position: relative; isolation: isolate;"></div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Review Theme Modal -->
+    <div id="review-theme-overlay" style="display:none; position:fixed; inset:0; background:rgba(0,0,0,0.85); z-index:10060; align-items:center; justify-content:center; backdrop-filter:blur(6px);">
+      <div class="theme-modal" style="max-width: 600px;">
+        <h3>Review Theme</h3>
+        <div id="review-loading">AI is analyzing this theme...</div>
+        <div id="review-content" style="display:none;">
+          <div class="review-section">
+            <strong>Safety Analysis:</strong>
+            <div id="review-safety" style="margin-top:4px; padding:8px; border-radius:6px; font-size:13px;"></div>
+          </div>
+          <div class="review-section">
+            <strong>Description:</strong>
+            <p id="review-desc" style="margin:4px 0 0; font-size:13px; color:#dbe9ff;"></p>
+          </div>
+          <div class="review-section">
+            <strong>Code:</strong>
+            <pre id="review-code" style="background:#0a0d14; padding:10px; border-radius:6px; overflow:auto; max-height:150px; font-size:12px; color:#aaddff;"></pre>
+          </div>
+        </div>
+        <div class="theme-actions">
+          <button id="review-theme-cancel" class="custom-popup-btn secondary">Cancel</button>
+          <button id="review-theme-apply" class="custom-popup-btn primary" disabled>Apply Theme</button>
+        </div>
+      </div>
+    </div>
+
+    <script type="module">
+      import { marked } from 'marked';
+      import DOMPurify from 'dompurify';
+
+      // Theme: load persisted and apply
+      const THEME_KEY = 'websim_theme_v1';
+      function applyTheme(theme) {
+        // Remove all built-in theme classes
+        const themeClasses = ['theme-light','theme-dark','theme-planet','theme-plant','theme-matrix','theme-sunset','theme-ocean','theme-festive'];
+        document.body.classList.remove(...themeClasses);
+        document.documentElement.classList.remove(...themeClasses);
+        
+        if (themeClasses.includes('theme-' + theme)) {
+            document.body.classList.add('theme-' + theme);
+            document.documentElement.classList.add('theme-' + theme);
+        } else {
+            // Default to planet
+            document.body.classList.add('theme-planet');
+            document.documentElement.classList.add('theme-planet');
+        }
+      }
+      function persistTheme(theme) {
+        try { localStorage.setItem(THEME_KEY, theme); } catch {}
+      }
+      function initThemeUI() {
+        const saved = localStorage.getItem(THEME_KEY) || 'planet';
+        applyTheme(saved);
+        // check radio
+        const radios = document.querySelectorAll('#settings-panel input[name="theme"]');
+        radios.forEach(r => {
+          r.checked = (r.value === saved);
+          r.addEventListener('change', () => {
+            applyTheme(r.value);
+            persistTheme(r.value);
+          });
+        });
+      }
+
+      function initHideImagesUI() {
+          const toggle = document.getElementById('hide-images-toggle');
+          if (!toggle) return;
+
+          const HIDE_IMAGES_KEY = 'websim_hide_images_v1';
+
+          function applyHideImages(hide) {
+              document.body.classList.toggle('chat-images-hidden', hide);
+          }
+
+          const saved = localStorage.getItem(HIDE_IMAGES_KEY) === 'true';
+          toggle.checked = saved;
+          applyHideImages(saved);
+
+          toggle.addEventListener('change', () => {
+              const hide = toggle.checked;
+              localStorage.setItem(HIDE_IMAGES_KEY, hide);
+              applyHideImages(hide);
+          });
+      }
+
+      function initTestModeUI() {
+          const toggle = document.getElementById('test-mode-toggle');
+          if (!toggle) return;
+
+          const testModeEnabled = localStorage.getItem('websim_test_mode') === 'true';
+          toggle.checked = testModeEnabled;
+
+          toggle.addEventListener('change', async () => {
+              localStorage.setItem('websim_test_mode', toggle.checked);
+              await showCustomPopup(
+                  'Reload Required',
+                  'Test mode setting changed. The page will now reload to apply the new configuration.',
+                  [{ text: 'Reload', value: true, class: 'primary' }]
+              );
+              window.location.reload();
+          });
+      }
+
+      function initFestiveEffects() {
+          const toggle = document.getElementById('festive-effects-toggle');
+          const KEY = 'websim_festive_effects_enabled';
+          let snowInterval = null;
+          let snowContainer = null;
+
+          function updateSnow(enabled) {
+              if (enabled) {
+                  if (!snowContainer) {
+                      snowContainer = document.createElement('div');
+                      snowContainer.id = 'snow-container';
+                      document.body.appendChild(snowContainer);
+                  }
+                  if (!snowInterval) {
+                      // Initial batch
+                      spawnFlakes(20);
+                      // Continuous spawning
+                      snowInterval = setInterval(() => spawnFlakes(5), 1000);
+                  }
+              } else {
+                  if (snowInterval) {
+                      clearInterval(snowInterval);
+                      snowInterval = null;
+                  }
+                  if (snowContainer) {
+                      snowContainer.remove();
+                      snowContainer = null;
+                  }
+              }
+          }
+
+          function spawnFlakes(count) {
+              if (!snowContainer) return;
+              for (let i = 0; i < count; i++) {
+                  const f = document.createElement('div');
+                  f.className = 'snowflake';
+                  f.textContent = ['❄', '❅', '❆', '•'][Math.floor(Math.random() * 4)];
+                  f.style.left = Math.random() * 100 + 'vw';
+                  f.style.animationDuration = (Math.random() * 5 + 3) + 's'; // 3-8s
+                  f.style.opacity = Math.random() * 0.7 + 0.3;
+                  f.style.fontSize = (Math.random() * 14 + 8) + 'px';
+                  
+                  // Cleanup after animation
+                  f.addEventListener('animationend', () => f.remove());
+                  
+                  snowContainer.appendChild(f);
+              }
+              // Cleanup excess flakes if tab was backgrounded
+              if (snowContainer.children.length > 300) {
+                  while(snowContainer.children.length > 200) {
+                      snowContainer.firstChild.remove();
+                  }
+              }
+          }
+
+          const saved = localStorage.getItem(KEY);
+          // Default to false if not set
+          const isEnabled = saved === null ? false : (saved === 'true');
+          
+          if (toggle) {
+              toggle.checked = isEnabled;
+              toggle.addEventListener('change', () => {
+                  localStorage.setItem(KEY, toggle.checked);
+                  updateSnow(toggle.checked);
+              });
+          }
+          
+          updateSnow(isEnabled);
+      }
+
+      function initTipRequestSettings() {
+        const get = () => ({
+          limit: parseInt(localStorage.getItem('tip_limit') || '50', 10),
+          offset: parseInt(localStorage.getItem('tip_offset') || '0', 10),
+        });
+        const limitEl = document.getElementById('tip-limit');
+        const offsetEl = document.getElementById('tip-offset');
+        const limitVal = document.getElementById('tip-limit-val');
+        const offsetVal = document.getElementById('tip-offset-val');
+        const { limit, offset } = get();
+        if (limitEl) { limitEl.value = limit; limitVal.textContent = String(limit); }
+        if (offsetEl) { offsetEl.value = offset; offsetVal.textContent = String(offset); }
+        limitEl?.addEventListener('input', () => {
+          localStorage.setItem('tip_limit', String(limitEl.value));
+          if (limitVal) limitVal.textContent = String(limitEl.value);
+        });
+        offsetEl?.addEventListener('input', () => {
+          localStorage.setItem('tip_offset', String(offsetEl.value));
+          if (offsetVal) offsetVal.textContent = String(offsetEl.value);
+        });
+      }
+
+      function setupSettingsPanel() {
+        const btn = document.getElementById('settings-button');
+        const panel = document.getElementById('settings-panel');
+        
+        // Custom Themes
+        const themesBtn = document.getElementById('custom-themes-button');
+        const themesPanel = document.getElementById('custom-themes-panel');
+
+        const overlay = document.getElementById('ui-overlay') || (() => {
+          const o = document.createElement('div');
+          o.id = 'ui-overlay';
+          o.addEventListener('click', () => {
+            panel.classList.remove('active');
+            if(themesPanel) themesPanel.classList.remove('active');
+            o.style.display = 'none';
+            if (window.multiplayerCursors) window.multiplayerCursors.closePlayerList();
+          });
+          document.body.appendChild(o);
+          return o;
+        })();
+
+        btn?.addEventListener('click', () => {
+          const isActive = panel.classList.toggle('active');
+          if(themesPanel) themesPanel.classList.remove('active'); // Close themes if open
+          overlay.style.display = isActive ? 'block' : 'none';
+          if (isActive && window.multiplayerCursors) window.multiplayerCursors.closePlayerList();
+          const osSwitcher = document.getElementById('osSwitcherContainer');
+          if (isActive && osSwitcher) osSwitcher.classList.remove('active');
+        });
+
+        themesBtn?.addEventListener('click', () => {
+          const isActive = themesPanel.classList.toggle('active');
+          if(panel) panel.classList.remove('active'); // Close settings if open
+          overlay.style.display = isActive ? 'block' : 'none';
+          if (isActive && window.multiplayerCursors) window.multiplayerCursors.closePlayerList();
+          const osSwitcher = document.getElementById('osSwitcherContainer');
+          if (isActive && osSwitcher) osSwitcher.classList.remove('active');
+        });
+
+        initThemeUI();
+        initHideImagesUI();
+        initTestModeUI();
+        initFestiveEffects();
+        initTipRequestSettings();
+        initCustomThemesUI();
+      }
+
+      // === Custom Themes Logic ===
+      let customThemes = [];
+      let currentReviewCss = "";
+      let currentReviewThemeId = "";
+      let editingThemeId = null; // Track which theme is being edited
+      let previewShadowRoot = null;
+      let baseCssContent = "";
+      
+      // History State
+      let themeHistory = []; // [{ id, timestamp, prompt, css, status, parentId }]
+      let activeVersionId = null;
+
+      // Moved to global scope to fix ReferenceError
+      async function generateAiTheme(prompt, parentId = null, retryId = null) {
+            const cssInput = document.getElementById('create-theme-css');
+            const versionId = retryId || crypto.randomUUID();
+            const timestamp = Date.now();
+            
+            if (!retryId) {
+                // Create new pending version, annotate with the user who created it
+                let creatorUsername = 'unknown';
+                try {
+                    const u = await window.websim.getCurrentUser();
+                    if (u && u.username) creatorUsername = u.username;
+                } catch (e) {}
+                themeHistory.push({
+                    id: versionId,
+                    timestamp,
+                    prompt,
+                    css: '',
+                    status: 'pending',
+                    parentId: parentId || activeVersionId,
+                    username: creatorUsername
+                });
+            } else {
+                // Update existing to pending
+                const v = themeHistory.find(v => v.id === retryId);
+                if(v) {
+                    v.status = 'pending';
+                    v.errorMsg = null;
+                    // refresh username in case it was missing
+                    try {
+                        const u = await window.websim.getCurrentUser();
+                        if (u && u.username) v.username = u.username;
+                    } catch (e) {}
+                }
+            }
+            
+            renderHistoryList();
+            activeVersionId = versionId; // Switch focus to new version immediately
+
+            try {
+                // Use cached base CSS
+                let baseCss = baseCssContent;
+                if (!baseCss) {
+                        const res = await fetch('style.css');
+                        baseCss = await res.text();
+                }
+                
+                if (baseCss.length > 20000) baseCss = baseCss.substring(0, 20000) + "...";
+
+                // Get context from parent if available
+                let contextCss = "";
+                const parentV = themeHistory.find(v => v.id === (parentId || activeVersionId));
+                
+                // Build history context string
+                let historyContext = "";
+                if (parentV) {
+                    const chain = [];
+                    let curr = parentV;
+                    // Limit to last 10 steps
+                    while(curr && chain.length < 10) {
+                        chain.unshift(curr);
+                        curr = themeHistory.find(v => v.id === curr.parentId);
+                    }
+                    
+                    if (chain.length > 0) {
+                        historyContext = "Previous requests in this history chain (oldest first):\n" + chain.map((v, i) => `${i+1}. "${v.prompt}"`).join("\n") + "\n\n";
+                    }
+                }
+
+                if (parentV && parentV.status === 'completed') {
+                    contextCss = parentV.css;
+                } else {
+                    contextCss = cssInput.value.trim();
+                }
+
+                let projectTitle = "Unknown";
+                try {
+                    const p = await window.websim.getCurrentProject();
+                    if (p && p.title) projectTitle = p.title;
+                } catch(e) {}
+
+                const systemPrompt = `You are a CSS expert. Generate CSS for a custom theme for the project "${projectTitle}" based on the user's request: "${prompt}".
+
+NOTE: websim.com is the hosting platform for this project and its images. It is NOT a typosquatting site. Treat references to websim.com as valid internal resources.
+
+${historyContext}IMPORTANT: You must style EVERYTHING to match the theme.
+Key areas:
+1. GLOBAL (body, html, #screen)
+2. HEADER (#header-bar, .header-icon-btn)
+3. CHAT (#chatContainer, messages, bubbles, input)
+4. OS SELECTION (#osSwitcherContainer, .os-switch-btn)
+5. MODALS (#settings-panel, .custom-popup-modal)
+6. ANNOUNCEMENTS (#announcementBar)
+
+IMPORTANT RULE: Always use the 'background' property instead of 'background-color' to ensure overrides work correctly against existing styles (e.g. gradients).
+Ensure text colors (color property) are readable against your backgrounds for all elements.
+
+Base CSS context:
+\`\`\`css
+${baseCss}
+\`\`\`
+
+Current/Parent CSS (modify this):
+\`\`\`css
+${contextCss}
+\`\`\`
+
+Output ONLY valid CSS. No markdown.`;
+
+                const modelSelect = document.getElementById('create-theme-ai-model');
+                const model = modelSelect ? modelSelect.value : 'gpt-4o';
+
+                const completion = await window.websim.chat.completions.create({
+                    model: model,
+                    messages: [
+                        { role: "user", content: systemPrompt }
+                    ]
+                });
+
+                let generatedCss = completion.content.trim();
+                generatedCss = generatedCss.replace(/^```css\s*/i, '').replace(/^```\s*/i, '').replace(/\s*```$/, '');
+
+                // Update version
+                const v = themeHistory.find(v => v.id === versionId);
+                if (v) {
+                    v.css = generatedCss;
+                    v.status = 'completed';
+                    cssInput.value = generatedCss;
+                    updateThemePreview(generatedCss);
+                }
+
+            } catch (e) {
+                console.error("AI Generation failed", e);
+                const v = themeHistory.find(v => v.id === versionId);
+                if (v) {
+                    v.status = 'error';
+                    v.errorMsg = "Generation failed";
+                }
+            } finally {
+                renderHistoryList();
+            }
+        }
+
+        function renderHistoryList() {
+            const historyList = document.getElementById('theme-history-list');
+            const cssInput = document.getElementById('create-theme-css');
+            
+            if (!historyList) return;
+
+            historyList.innerHTML = '';
+            
+            if (themeHistory.length === 0) {
+                historyList.innerHTML = '<div style="font-size:12px; color:#666; text-align:center; padding:20px;">No history yet.</div>';
+                return;
+            }
+
+            // 1. Build Tree
+            const nodes = new Map();
+            themeHistory.forEach(h => nodes.set(h.id, { ...h, children: [] }));
+            
+            const roots = [];
+            nodes.forEach(node => {
+                if (node.parentId && nodes.has(node.parentId)) {
+                    nodes.get(node.parentId).children.push(node);
+                } else {
+                    roots.push(node);
+                }
+            });
+
+            // 2. Sort by timestamp ascending (Oldest top)
+            const sortAsc = (a,b) => a.timestamp - b.timestamp;
+            roots.sort(sortAsc);
+            nodes.forEach(n => n.children.sort(sortAsc));
+
+            // 3. Identify active path (from active leaf up to root)
+            const activePath = new Set();
+            let curr = nodes.get(activeVersionId);
+            while(curr) {
+                activePath.add(curr.id);
+                curr = nodes.get(curr.parentId);
+            }
+
+            // 4. Recursive Render
+            function createNodeEl(node, depth) {
+                const isActive = node.id === activeVersionId;
+                const isOnPath = activePath.has(node.id);
+                // Minimized if not on active path and not the active node itself (though active node IS on active path)
+                const isMinimized = !isOnPath;
+
+                const item = document.createElement('div');
+                
+                // Indent
+                const indent = Math.min(depth * 10, 100); 
+                
+                item.style.cssText = `
+                    margin-left: ${indent}px;
+                    margin-top: 4px;
+                    padding: ${isMinimized ? '4px 8px' : '8px'};
+                    border-radius: 6px;
+                    background: ${isActive ? 'rgba(79, 211, 255, 0.15)' : (isMinimized ? 'rgba(255,255,255,0.03)' : 'rgba(255,255,255,0.05)')};
+                    border: 1px solid ${isActive ? '#4fd3ff' : 'rgba(255,255,255,0.1)'};
+                    cursor: pointer;
+                    position: relative;
+                    transition: all 0.2s;
+                    opacity: ${isMinimized ? 0.6 : 1};
+                    display: flex;
+                    flex-direction: column;
+                    gap: 2px;
+                `;
+                if(isMinimized) {
+                    item.style.flexDirection = 'row';
+                    item.style.alignItems = 'center';
+                    item.style.justifyContent = 'space-between';
+                }
+                
+                if (node.status === 'error') item.style.borderColor = '#ff6b6b';
+
+                item.addEventListener('click', (e) => {
+                    e.stopPropagation();
+                    activeVersionId = node.id;
+                    if (node.status === 'completed' && node.css) {
+                        cssInput.value = node.css;
+                        updateThemePreview(node.css);
+                    }
+                    renderHistoryList();
+                });
+
+                // Status Icon
+                let statusIcon = '';
+                if (node.status === 'pending') statusIcon = '<span class="spin">⏳</span>';
+                else if (node.status === 'error') statusIcon = '❌';
+                else if (isActive && !isMinimized) statusIcon = '✅';
+                
+                // Prompt Text
+                const promptText = node.prompt || 'Manual Edit';
+
+                if (isMinimized) {
+                    // Compact View
+                    item.innerHTML = `
+                        <div style="display:flex; align-items:center; gap:6px; flex:1; min-width:0;">
+                            <span style="opacity:0.5; font-size:10px;">↳</span>
+                            <span style="font-size:11px; color:#8fb3ff; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;">${promptText}</span>
+                        </div>
+                        <div style="font-size:10px;">${statusIcon}</div>
+                    `;
+                } else {
+                    // Expanded View
+                    const timeStr = new Date(node.timestamp).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'});
+                    item.innerHTML = `
+                        <div style="display:flex; justify-content:space-between; font-size:10px; color:#8fb3ff; opacity:0.8;">
+                            <span>${timeStr}</span>
+                            <span>${statusIcon}</span>
+                        </div>
+                        <div style="font-size:12px; color:#eaf2ff; font-weight:600; line-height:1.3; word-break:break-word;">
+                            ${promptText}
+                        </div>
+                        <div style="font-size:11px; color:#8fb3ff; margin-top:6px;">by @${node.username || node.creator_username || 'unknown'}</div>
+                        <div style="display:flex; gap:6px; margin-top:6px; justify-content:flex-end;">
+                            ${node.status !== 'pending' ? `<button class="ver-retry-btn" style="font-size:10px; padding:2px 6px; background:rgba(255,255,255,0.1); border:none; border-radius:3px; color:#bfe7ff; cursor:pointer;" title="Retry/Fork">Retry</button>` : ''}
+                            <button class="ver-del-btn" style="font-size:10px; padding:2px 6px; background:rgba(255,255,255,0.1); border:none; border-radius:3px; color:#ffb4a8; cursor:pointer; opacity:0.7;">Del</button>
+                        </div>
+                    `;
+                }
+
+                // Button handlers
+                const retryBtn = item.querySelector('.ver-retry-btn');
+                if (retryBtn) {
+                    retryBtn.addEventListener('click', (e) => {
+                        e.stopPropagation();
+                        // If there are versions ahead (children), make a fork. Otherwise retry in place.
+                        if (node.children && node.children.length > 0) {
+                            generateAiTheme(node.prompt, node.parentId, null); // null retryId forces new ID (fork)
+                        } else {
+                            generateAiTheme(node.prompt, node.parentId, node.id); // Retry in place
+                        }
+                    });
+                }
+                const delBtn = item.querySelector('.ver-del-btn');
+                if (delBtn) {
+                    delBtn.addEventListener('click', (e) => {
+                        e.stopPropagation();
+                        if(confirm("Delete this version branch?")) {
+                            // Find all descendants to delete
+                            const idsToDelete = new Set([node.id]);
+                            const stack = [...node.children];
+                            while(stack.length) {
+                                const c = stack.pop();
+                                idsToDelete.add(c.id);
+                                stack.push(...c.children);
+                            }
+                            themeHistory = themeHistory.filter(h => !idsToDelete.has(h.id));
+                            
+                            // If we deleted the active version, select parent or null
+                            if (idsToDelete.has(activeVersionId)) {
+                                activeVersionId = node.parentId || (roots[0]?.id === node.id ? (roots[1]?.id || null) : roots[0]?.id) || null;
+                            }
+                            renderHistoryList();
+                        }
+                    });
+                }
+
+                historyList.appendChild(item);
+
+                // Render Children
+                if (node.children.length > 0) {
+                    if (isMinimized) {
+                        // Compact child indicator
+                        const countSpan = document.createElement('span');
+                        countSpan.style.cssText = "font-size:9px; background:rgba(255,255,255,0.1); padding:0 3px; border-radius:3px; margin-left:4px;";
+                        countSpan.textContent = `+${node.children.length}`;
+                        item.querySelector('div').appendChild(countSpan);
+                    } else {
+                        // Expand children
+                        node.children.forEach(child => createNodeEl(child, depth + 1));
+                    }
+                }
+            }
+
+            roots.forEach(root => createNodeEl(root, 0));
+        }
+
+      // Cache for status change notifications
+      window._prevVmStatuses = window._prevVmStatuses || {};
+
+      function initExtendedSettings() {
+        const vmNotifs = document.getElementById('vm-notifications-toggle');
+        const spawnRadios = document.querySelectorAll('input[name="spawn-pref"]');
+
+        if (vmNotifs) {
+            vmNotifs.checked = localStorage.getItem('websim_vm_status_notifs') === 'true';
+            vmNotifs.addEventListener('change', () => {
+                localStorage.setItem('websim_vm_status_notifs', vmNotifs.checked);
+            });
+        }
+
+        if (spawnRadios.length) {
+            const savedSpawn = localStorage.getItem('websim_spawn_pref') || 'random';
+            spawnRadios.forEach(r => {
+                r.checked = r.value === savedSpawn;
+                r.addEventListener('change', () => {
+                    localStorage.setItem('websim_spawn_pref', r.value);
+                });
+            });
+        }
+      }
+
+      function initCustomThemesUI() {
+        const createBtn = document.getElementById('create-theme-btn');
+        const listContainer = document.getElementById('custom-themes-list');
+        const createOverlay = document.getElementById('create-theme-overlay');
+        const createCancel = document.getElementById('create-theme-cancel');
+        const createSave = document.getElementById('create-theme-save');
+        const reviewOverlay = document.getElementById('review-theme-overlay');
+        const reviewCancel = document.getElementById('review-theme-cancel');
+        const reviewApply = document.getElementById('review-theme-apply');
+        const searchInput = document.getElementById('theme-search-input');
+        const refreshBtn = document.getElementById('refresh-themes-btn');
+        
+        // AI elements
+        const aiPromptInput = document.getElementById('create-theme-ai-prompt');
+        const aiGenBtn = document.getElementById('create-theme-ai-btn');
+        const cssInput = document.getElementById('create-theme-css');
+        const modalTitle = document.getElementById('create-theme-modal-title');
+        
+        // History elements
+        const historyList = document.getElementById('theme-history-list');
+        const clearHistoryBtn = document.getElementById('theme-history-clear');
+
+        // Fetch base CSS once for AI and Preview and set up presets
+        fetch('style.css').then(r => r.text()).then(css => {
+            baseCssContent = css;
+        }).catch(e => console.warn("Failed to load base CSS for preview"));
+
+        // Preset themes (load style.css by default, plus a few small variants)
+        const themePresets = [
+          { id: 'preset-style', name: 'Project style.css', cssSource: async () => {
+              try { const r = await fetch('style.css'); return await r.text(); } catch { return baseCssContent || ''; }
+            }},
+          { id: 'preset-plant', name: 'Plant', cssSource: async () => `
+/* Plant Theme */
+:root { --plant-bg: #1a2f1d; --plant-fg: #e0f5e0; --plant-accent: #4caf50; --plant-panel: rgba(25, 45, 30, 0.95); --plant-border: #3a5a40; }
+body, html { background-color: var(--plant-bg); color: var(--plant-fg); }
+#screen { background: radial-gradient(circle at center, #2d4a32 0%, #1a2f1d 100%); border-top: 1px solid var(--plant-border); }
+#header-bar { background: rgba(30, 55, 35, 0.95); border-bottom: 1px solid var(--plant-border); }
+.header-icon-btn, #reconnect-btn, #report-button, #tip-jar-button, #discord-link, #os-switcher-toggle { background: rgba(255,255,255,0.05); color: #a5d6a7; border: 1px solid var(--plant-border); }
+.header-icon-btn:hover, #reconnect-btn:hover, #report-button:hover, #tip-jar-button:hover, #discord-link:hover, #os-switcher-toggle:hover { background: rgba(76, 175, 80, 0.2); color: #fff; border-color: var(--plant-accent); }
+#chatContainer, #settings-panel, #custom-themes-panel, #playerListContainer, #osSwitcherContainer, #tip-jar-container, .announcement, #announcementComposer, .custom-popup-modal, #report-modal, #manual-password-modal, #vm-rules-modal, #profile-popup-modal {
+    background: var(--plant-panel) !important; border: 1px solid var(--plant-border) !important; color: var(--plant-fg) !important; box-shadow: 0 4px 20px rgba(0,0,0,0.4);
+}
+#chatHeader, #tip-jar-header { background: rgba(40, 70, 45, 0.95) !important; border-bottom: 1px solid var(--plant-border) !important; }
+.chat-body { background: rgba(255,255,255,0.05) !important; border: 1px solid rgba(255,255,255,0.1) !important; color: #e8f5e9 !important; }
+.chat-message.own-message .chat-body { background: var(--plant-accent) !important; color: #fff !important; border-color: transparent !important; }
+.os-switch-btn, .theme-option, .player-item, .tip-entry { background: rgba(255,255,255,0.03) !important; border: 1px solid var(--plant-border) !important; color: #c8e6c9 !important; }
+.os-switch-btn:hover, .theme-option:hover, .tip-entry:hover { background: rgba(255,255,255,0.08) !important; border-color: var(--plant-accent) !important; }
+.os-switch-btn[aria-current='true'], .player-item.current-os-item { background: rgba(76, 175, 80, 0.15) !important; border-color: var(--plant-accent) !important; }
+input, textarea, select { background: rgba(0,0,0,0.3) !important; border: 1px solid var(--plant-border) !important; color: var(--plant-fg) !important; }
+input:focus, textarea:focus { border-color: var(--plant-accent) !important; }
+button { color: var(--plant-fg); }
+::-webkit-scrollbar-thumb { background: var(--plant-border); }
+::-webkit-scrollbar-track { background: rgba(0,0,0,0.1); }
+`},
+          { id: 'preset-matrix', name: 'Matrix', cssSource: async () => `
+/* Matrix Theme */
+:root { --matrix-black: #000000; --matrix-green: #00ff41; --matrix-dark-green: #003b00; }
+body, html, button, input, textarea, select { background-color: var(--matrix-black); color: var(--matrix-green); font-family: 'Courier New', monospace; }
+#screen { background: #000; border-top: 1px solid var(--matrix-green); }
+#header-bar { background: #000800; border-bottom: 1px solid var(--matrix-green); }
+.header-icon-btn, #reconnect-btn, #report-button, #tip-jar-button, #discord-link, #os-switcher-toggle { background: #000; border: 1px solid var(--matrix-green); color: var(--matrix-green); box-shadow: 0 0 5px var(--matrix-dark-green); }
+.header-icon-btn:hover, #reconnect-btn:hover, #report-button:hover, #tip-jar-button:hover, #discord-link:hover, #os-switcher-toggle:hover { background: var(--matrix-dark-green); box-shadow: 0 0 10px var(--matrix-green); text-shadow: 0 0 5px var(--matrix-green); }
+#chatContainer, #settings-panel, #custom-themes-panel, #playerListContainer, #osSwitcherContainer, #tip-jar-container, .announcement, #announcementComposer, .custom-popup-modal, #report-modal, #manual-password-modal, #vm-rules-modal, #profile-popup-modal {
+    background: rgba(0, 5, 0, 0.95) !important; border: 1px solid var(--matrix-green) !important; color: var(--matrix-green) !important; box-shadow: 0 0 10px var(--matrix-dark-green);
+}
+#chatHeader, #tip-jar-header { background: #001100 !important; border-bottom: 1px solid var(--matrix-green) !important; color: var(--matrix-green) !important; text-transform: uppercase; }
+.chat-body { background: #000 !important; border: 1px solid var(--matrix-dark-green) !important; color: var(--matrix-green) !important; font-family: 'Courier New', monospace !important; }
+.chat-message.own-message .chat-body { background: var(--matrix-dark-green) !important; border: 1px solid var(--matrix-green) !important; }
+.os-switch-btn, .theme-option, .player-item, .tip-entry { background: #000 !important; border: 1px solid var(--matrix-dark-green) !important; color: var(--matrix-green) !important; }
+.os-switch-btn:hover, .theme-option:hover, .tip-entry:hover { background: #001100 !important; border-color: var(--matrix-green) !important; box-shadow: 0 0 8px var(--matrix-green); }
+.os-switch-btn[aria-current='true'], .player-item.current-os-item { background: #002200 !important; border: 1px solid var(--matrix-green) !important; box-shadow: inset 0 0 10px var(--matrix-green); }
+input, textarea { background: #000 !important; border: 1px solid var(--matrix-green) !important; color: var(--matrix-green) !important; }
+::-webkit-scrollbar-thumb { background: var(--matrix-green); }
+::-webkit-scrollbar-track { background: #001100; }
+a { color: #88ff88; }
+`},
+          { id: 'preset-sunset', name: 'Sunset', cssSource: async () => `
+/* Sunset Theme */
+:root { --sunset-grad: linear-gradient(135deg, #4a192c, #2c162e); --sunset-panel: rgba(60, 20, 40, 0.9); --sunset-border: #ff9e80; --sunset-text: #ffd1dc; --sunset-accent: #ff7043; }
+body, html { background: var(--sunset-grad); color: var(--sunset-text); }
+#screen { background: radial-gradient(circle at bottom, #6d2c48 0%, #2c162e 100%); border-top: 1px solid var(--sunset-accent); }
+#header-bar { background: rgba(50, 15, 30, 0.95); border-bottom: 1px solid var(--sunset-accent); background-blend-mode: overlay; }
+.header-icon-btn, #reconnect-btn, #report-button, #tip-jar-button, #discord-link, #os-switcher-toggle { background: rgba(255, 100, 100, 0.1); border: 1px solid rgba(255, 158, 128, 0.4); color: #ffccbc; }
+.header-icon-btn:hover, #reconnect-btn:hover, #report-button:hover, #tip-jar-button:hover, #discord-link:hover, #os-switcher-toggle:hover { background: rgba(255, 87, 34, 0.3); border-color: var(--sunset-accent); color: #fff; box-shadow: 0 0 15px rgba(255, 112, 67, 0.4); }
+#chatContainer, #settings-panel, #custom-themes-panel, #playerListContainer, #osSwitcherContainer, #tip-jar-container, .announcement, #announcementComposer, .custom-popup-modal, #report-modal, #manual-password-modal, #vm-rules-modal, #profile-popup-modal {
+    background: var(--sunset-panel) !important; border: 1px solid var(--sunset-border) !important; color: var(--sunset-text) !important; box-shadow: 0 5px 25px rgba(40, 10, 20, 0.6); backdrop-filter: blur(8px);
+}
+#chatHeader, #tip-jar-header { background: linear-gradient(to right, #ff5e62, #ff9966) !important; border-bottom: none !important; color: #fff !important; }
+.chat-body { background: rgba(80, 30, 50, 0.6) !important; border: 1px solid rgba(255, 158, 128, 0.3) !important; color: #fff !important; }
+.chat-message.own-message .chat-body { background: linear-gradient(135deg, #ff7043, #ff5e62) !important; border: none !important; box-shadow: 0 2px 8px rgba(255, 94, 98, 0.4); }
+.os-switch-btn, .theme-option, .player-item, .tip-entry { background: rgba(255,255,255,0.05) !important; border: 1px solid rgba(255, 158, 128, 0.3) !important; color: #ffccbc !important; }
+.os-switch-btn:hover, .theme-option:hover, .tip-entry:hover { background: rgba(255, 87, 34, 0.15) !important; border-color: var(--sunset-accent) !important; }
+.os-switch-btn[aria-current='true'], .player-item.current-os-item { background: linear-gradient(90deg, rgba(255, 112, 67, 0.2), rgba(255, 87, 34, 0.1)) !important; border-color: var(--sunset-accent) !important; }
+input, textarea, select { background: rgba(40, 10, 20, 0.5) !important; border: 1px solid var(--sunset-border) !important; color: #fff !important; }
+input:focus { box-shadow: 0 0 0 2px rgba(255, 158, 128, 0.4) !important; }
+::-webkit-scrollbar-thumb { background: var(--sunset-accent); border-radius: 4px; }
+::-webkit-scrollbar-track { background: rgba(40, 10, 20, 0.3); }
+`},
+          { id: 'preset-ocean', name: 'Ocean', cssSource: async () => `
+/* Ocean Theme */
+:root { --ocean-bg: #001e26; --ocean-panel: rgba(0, 40, 50, 0.92); --ocean-border: #00bcd4; --ocean-text: #e0f7fa; --ocean-accent: #00e5ff; }
+body, html { background-color: var(--ocean-bg); color: var(--ocean-text); }
+#screen { background: radial-gradient(circle, #004d40 0%, #001e26 100%); border-top: 1px solid var(--ocean-border); }
+#header-bar { background: rgba(0, 60, 70, 0.95); border-bottom: 1px solid var(--ocean-border); box-shadow: 0 0 15px rgba(0, 188, 212, 0.2); }
+.header-icon-btn, #reconnect-btn, #report-button, #tip-jar-button, #discord-link, #os-switcher-toggle { background: rgba(0, 188, 212, 0.1); border: 1px solid rgba(0, 229, 255, 0.3); color: var(--ocean-text); }
+.header-icon-btn:hover, #reconnect-btn:hover, #report-button:hover, #tip-jar-button:hover, #discord-link:hover, #os-switcher-toggle:hover { background: rgba(0, 188, 212, 0.3); border-color: var(--ocean-accent); box-shadow: 0 0 10px var(--ocean-accent); color: #fff; }
+#chatContainer, #settings-panel, #custom-themes-panel, #playerListContainer, #osSwitcherContainer, #tip-jar-container, .announcement, #announcementComposer, .custom-popup-modal, #report-modal, #manual-password-modal, #vm-rules-modal, #profile-popup-modal {
+    background: var(--ocean-panel) !important; border: 1px solid var(--ocean-border) !important; color: var(--ocean-text) !important; box-shadow: 0 0 20px rgba(0,0,0,0.5); border-radius: 8px;
+}
+#chatHeader, #tip-jar-header { background: rgba(0, 96, 100, 0.9) !important; border-bottom: 1px solid var(--ocean-border) !important; }
+.chat-body { background: rgba(0, 0, 0, 0.2) !important; border: 1px solid rgba(0, 229, 255, 0.2) !important; color: #e0f7fa !important; }
+.chat-message.own-message .chat-body { background: linear-gradient(135deg, #0097a7, #006064) !important; border-color: var(--ocean-accent) !important; }
+.os-switch-btn, .theme-option, .player-item, .tip-entry { background: rgba(0, 0, 0, 0.2) !important; border: 1px solid rgba(0, 188, 212, 0.3) !important; color: #b2ebf2 !important; }
+.os-switch-btn:hover, .theme-option:hover, .tip-entry:hover { background: rgba(0, 188, 212, 0.15) !important; border-color: var(--ocean-accent) !important; box-shadow: 0 0 8px var(--ocean-accent); }
+.os-switch-btn[aria-current='true'], .player-item.current-os-item { background: rgba(0, 229, 255, 0.15) !important; border: 1px solid var(--ocean-accent) !important; box-shadow: inset 0 0 15px rgba(0, 229, 255, 0.1); }
+input, textarea, select { background: rgba(0, 30, 40, 0.6) !important; border: 1px solid var(--ocean-border) !important; color: var(--ocean-accent) !important; }
+input:focus { border-color: #fff !important; box-shadow: 0 0 8px var(--ocean-accent); }
+::-webkit-scrollbar-thumb { background: var(--ocean-border); border-radius: 4px; }
+::-webkit-scrollbar-track { background: rgba(0,20,30,0.5); }
+`},
+          { id: 'preset-festive', name: 'Festive', cssSource: async () => `
+/* Festive Theme (Christmas) */
+:root { --festive-bg: #0f2229; --festive-panel: rgba(20, 30, 25, 0.95); --festive-gold: #ffd700; --festive-red: #c41e3a; --festive-green: #1a472a; }
+body, html { background: linear-gradient(135deg, #0f2229, #1a0b0b); color: #fff5e6; }
+#header-bar { background: linear-gradient(to right, #1a472a, #5c1818); border-bottom: 1px solid #ffd700; box-shadow: 0 0 15px rgba(255, 215, 0, 0.2); }
+.header-icon-btn, #reconnect-btn, #report-button, #tip-jar-button, #discord-link, #os-switcher-toggle { background: rgba(255, 255, 255, 0.1); border: 1px solid #ffd700; color: #ffd700; }
+.header-icon-btn:hover, #reconnect-btn:hover, #report-button:hover, #tip-jar-button:hover, #discord-link:hover, #os-switcher-toggle:hover { background: rgba(255, 215, 0, 0.2); color: #fff; box-shadow: 0 0 10px #ffd700; transform: translateY(-1px); }
+#chatContainer, #settings-panel, #custom-themes-panel, #playerListContainer, #osSwitcherContainer, #tip-jar-container, .announcement, #announcementComposer, .custom-popup-modal, #report-modal, #manual-password-modal, #vm-rules-modal, #profile-popup-modal {
+    background: var(--festive-panel) !important; border: 1px solid var(--festive-red) !important; color: #fff5e6 !important; box-shadow: 0 0 15px rgba(196, 30, 58, 0.3); border-radius: 8px;
+}
+#chatHeader, #tip-jar-header { background: linear-gradient(to right, #5c1818, #1a472a) !important; border-bottom: 1px solid #ffd700 !important; color: #ffd700 !important; }
+.chat-body { background: rgba(0, 0, 0, 0.4) !important; border: 1px solid rgba(255, 215, 0, 0.3) !important; color: #fff !important; }
+.chat-message.own-message .chat-body { background: linear-gradient(135deg, #1a472a, #2d6a4f) !important; border-color: #ffd700 !important; }
+.os-switch-btn, .theme-option, .player-item, .tip-entry { background: rgba(255, 255, 255, 0.05) !important; border: 1px solid var(--festive-red) !important; color: #ffd700 !important; }
+.os-switch-btn:hover, .theme-option:hover, .tip-entry:hover { background: rgba(196, 30, 58, 0.2) !important; border-color: #ffd700 !important; }
+.os-switch-btn[aria-current='true'], .player-item.current-os-item { background: linear-gradient(135deg, #5c1818, #7d2020) !important; border-color: #ffd700 !important; }
+input, textarea, select { background: rgba(20, 30, 25, 0.8) !important; border: 1px solid var(--festive-gold) !important; color: #fff !important; }
+input:focus { border-color: #fff !important; box-shadow: 0 0 8px var(--festive-gold); }
+::-webkit-scrollbar-thumb { background: var(--festive-gold); border-radius: 4px; }
+::-webkit-scrollbar-track { background: rgba(20, 30, 25, 0.5); }
+`},
+          { id: 'preset-dark-min', name: 'Dark Minimal', cssSource: async () => `
+            /* Dark Minimal */
+            body { background: #07101a; color: #dbe9ff; }
+            #header-bar { background: rgba(8,12,18,0.95); border-bottom-color: rgba(60,80,110,0.1); }
+            #chatContainer { background: rgba(10,12,16,0.95); }
+            `},
+          { id: 'preset-light-min', name: 'Light Minimal', cssSource: async () => `
+            /* Light Minimal */
+            body { background: #f7fafc; color: #0e1a2b; }
+            #header-bar { background: #ffffff; border-bottom: 1px solid rgba(0,0,0,0.06); }
+            #chatContainer { background: #ffffff; }
+            `},
+          { id: 'preset-contrast', name: 'High Contrast', cssSource: async () => `
+            /* High Contrast */
+            body { background: #000; color: #fff; }
+            .header-icon-btn, #reconnect-btn { background: #222; border-color: #fff; color: #fff; }
+            #chatContainer { background: #111; border-color: #fff; }
+            `}
+        ];
+
+        // Expose presets renderer for when modal opens
+        function renderThemePresets() {
+          const presetContainer = document.getElementById('theme-presets-container');
+          if (!presetContainer) return;
+          presetContainer.innerHTML = '';
+          
+          // Button to Import currently active Settings theme
+          const importBtn = document.createElement('button');
+          importBtn.className = 'custom-popup-btn secondary';
+          importBtn.style.fontSize = '12px';
+          importBtn.style.padding = '6px 8px';
+          importBtn.style.marginRight = '6px';
+          importBtn.style.border = '1px dashed rgba(255,255,255,0.4)';
+          importBtn.textContent = 'Import Active Theme';
+          importBtn.title = 'Copy CSS from the theme currently selected in Settings';
+          importBtn.addEventListener('click', async (e) => {
+              e.preventDefault();
+              const activeTheme = localStorage.getItem(THEME_KEY) || 'planet';
+              
+              // Find matching preset by name or id
+              let match = themePresets.find(p => p.name.toLowerCase() === activeTheme || p.id === 'preset-' + activeTheme);
+              
+              // If not found in presets (e.g. planet/light/dark may not have exact matches in themePresets array above?), try to construct
+              if (!match && (activeTheme === 'planet' || activeTheme === 'light' || activeTheme === 'dark')) {
+                  // Fallback to style.css for standard themes
+                  try {
+                      const res = await fetch('style.css');
+                      const fullCss = await res.text();
+                      const cssInput = document.getElementById('create-theme-css');
+                      // Just dump full CSS? A bit heavy. 
+                      // Actually, if it's a standard theme, maybe just user wants the base styles.
+                      cssInput.value = fullCss;
+                      updateThemePreview(fullCss);
+                      return;
+                  } catch(e) {}
+              }
+
+              if (match) {
+                  try {
+                      const css = await match.cssSource();
+                      const cssInput = document.getElementById('create-theme-css');
+                      if (cssInput) {
+                          cssInput.value = css;
+                          updateThemePreview(css);
+                      }
+                  } catch(err) { console.warn("Error importing preset", err); }
+              } else {
+                  if (window.showNotification) window.showNotification("Current theme '" + activeTheme + "' has no importable source.", "info");
+              }
+          });
+          presetContainer.appendChild(importBtn);
+
+          themePresets.forEach(p => {
+            const btn = document.createElement('button');
+            btn.className = 'custom-popup-btn secondary';
+            btn.style.fontSize = '12px';
+            btn.style.padding = '6px 8px';
+            btn.style.marginRight = '6px';
+            btn.textContent = p.name;
+            btn.addEventListener('click', async (e) => {
+              e.preventDefault();
+              try {
+                const css = await p.cssSource();
+                const cssInput = document.getElementById('create-theme-css');
+                if (cssInput) {
+                  cssInput.value = css || '';
+                  updateThemePreview(cssInput.value);
+                }
+              } catch(err) { console.warn('Failed to load preset:', err); }
+            });
+            presetContainer.appendChild(btn);
+          });
+        }
+
+        // Also fetch project creator info so we can grant the creator full theme edit/delete rights
+        (async () => {
+            try {
+                const creator = await window.websim.getCreator();
+                window.WEBSIM_PROJECT_CREATOR_ID = creator?.id || null;
+                window.WEBSIM_PROJECT_CREATOR_USERNAME = creator?.username || null;
+            } catch (e) {
+                window.WEBSIM_PROJECT_CREATOR_ID = null;
+                window.WEBSIM_PROJECT_CREATOR_USERNAME = null;
+            }
+        })();
+
+        // Initialize Preview Shadow DOM
+        const previewContainer = document.getElementById('theme-preview-container');
+        if (previewContainer && !previewShadowRoot) {
+            previewShadowRoot = previewContainer.attachShadow({ mode: 'open' });
+            initThemePreviewHTML();
+        }
+
+        // Real-time preview update
+        cssInput.addEventListener('input', () => {
+            updateThemePreview(cssInput.value);
+            // If user types manually, should we create a "Manual Edit" version? 
+            // Maybe just let them save. Or create a draft state. 
+            // For now, let's keep manual edits as just modifying current state.
+        });
+
+        if (aiGenBtn) {
+            aiGenBtn.addEventListener('click', async () => {
+                const prompt = aiPromptInput.value.trim();
+                if (!prompt) {
+                    if (window.showNotification) window.showNotification("Please enter a description for the AI.", "info");
+                    return;
+                }
+                // Fork from current active version
+                await generateAiTheme(prompt, activeVersionId);
+            });
+        }
+
+        if (clearHistoryBtn) {
+            clearHistoryBtn.addEventListener('click', () => {
+                if(confirm("Clear all version history?")) {
+                    themeHistory = [];
+                    renderHistoryList();
+                }
+            });
+        }
+
+        if (refreshBtn) {
+            refreshBtn.addEventListener('click', () => {
+                loadCustomThemes();
+                refreshBtn.animate([
+                    { transform: 'rotate(0deg)' },
+                    { transform: 'rotate(360deg)' }
+                ], { duration: 500 });
+            });
+        }
+
+        // Search listener
+        if (searchInput) {
+            searchInput.addEventListener('input', () => {
+                renderThemesList();
+            });
+        }
+
+        // Open Create Modal (Reset)
+        createBtn.addEventListener('click', async () => {
+          editingThemeId = null; // Clear editing state
+          themeHistory = []; // Reset local history for new session
+          activeVersionId = null;
+          
+          document.getElementById('create-theme-modal-title').textContent = "Create Custom Theme";
+          document.getElementById('create-theme-name').value = '';
+
+          // Put the project's style.css into the editor by default (fallback to cached baseCssContent)
+          const cssInputEl = document.getElementById('create-theme-css');
+          try {
+            let defaultCss = baseCssContent || '';
+            if (!defaultCss) {
+              const res = await fetch('style.css');
+              if (res.ok) defaultCss = await res.text();
+            }
+            cssInputEl.value = defaultCss || '';
+            updateThemePreview(cssInputEl.value);
+          } catch (err) {
+            console.warn('Could not prefill theme editor with style.css', err);
+            cssInputEl.value = '';
+            updateThemePreview('');
+          }
+
+          // Render presets UI inside the modal (create container if missing)
+          let presetsHolder = document.getElementById('theme-presets-container');
+          if (!presetsHolder) {
+            presetsHolder = document.createElement('div');
+            presetsHolder.id = 'theme-presets-container';
+            presetsHolder.style.cssText = 'display:flex; gap:8px; flex-wrap:wrap; margin-bottom:8px;';
+            // Insert presets container above the CSS textarea
+            const modalEditorCol = document.querySelector('#create-theme-modal-title').parentElement;
+            const cssEl = document.getElementById('create-theme-css');
+            modalEditorCol.insertBefore(presetsHolder, cssEl);
+          }
+          renderThemePresets();
+
+          if (aiPromptInput) aiPromptInput.value = '';
+          createOverlay.style.display = 'flex';
+          createSave.textContent = "Save & Upload";
+          
+          renderHistoryList();
+        });
+
+        // Close Create Modal
+        createCancel.addEventListener('click', () => createOverlay.style.display = 'none');
+        createOverlay.addEventListener('click', (e) => {
+            if(e.target === createOverlay) createOverlay.style.display = 'none';
+        });
+
+        // Save Theme (Create or Update)
+        createSave.addEventListener('click', async () => {
+            const name = document.getElementById('create-theme-name').value.trim();
+            const css = document.getElementById('create-theme-css').value.trim();
+            if (!name || !css) {
+                if (window.showNotification) window.showNotification("Name and CSS are required", "error");
+                return;
+            }
+
+            createSave.disabled = true;
+            createSave.textContent = "Saving...";
+            try {
+                const user = await window.websim.getCurrentUser();
+                if (!user) throw new Error("Not logged in");
+                
+                const themeData = {
+                    name, 
+                    css,
+                    history: JSON.stringify(themeHistory), // Save history!
+                    creator_id: user.id, 
+                    creator_username: user.username
+                };
+
+                if (editingThemeId) {
+                    // Update existing
+                    await window.multiplayerCursors.room.collection('custom_theme_v1').update(editingThemeId, themeData);
+                } else {
+                    // Create new
+                    await window.multiplayerCursors.room.collection('custom_theme_v1').create(themeData);
+                }
+                
+                createOverlay.style.display = 'none';
+                loadCustomThemes();
+                
+                // If we edited the currently applied theme, re-apply the CSS live
+                const currentAppliedId = localStorage.getItem('websim_custom_theme_id');
+                if (currentAppliedId && currentAppliedId === editingThemeId) {
+                    applyCustomCss(css, editingThemeId, false);
+                }
+
+            } catch(e) {
+                console.error(e);
+                if (window.showNotification) window.showNotification("Failed to save theme", "error");
+            } finally {
+                createSave.disabled = false;
+                createSave.textContent = "Save & Upload";
+            }
+        });
+
+        // Review Modal Actions
+        reviewCancel.addEventListener('click', () => reviewOverlay.style.display = 'none');
+        reviewApply.addEventListener('click', () => {
+            applyCustomCss(currentReviewCss, currentReviewThemeId);
+            reviewOverlay.style.display = 'none';
+        });
+
+        // Initial Load
+        loadCustomThemes();
+        // Auto-refresh themes list every 30s
+        setInterval(loadCustomThemes, 30000);
+
+        // Load previously applied theme
+        const savedThemeId = localStorage.getItem('websim_custom_theme_id');
+        if (savedThemeId) {
+             // We need to fetch it to get CSS. We'll wait for loadCustomThemes to handle it potentially,
+             // or better, handle it when list loads.
+        }
+      }
+
+      async function loadCustomThemes() {
+        const list = document.getElementById('custom-themes-list');
+        if (!list) return;
+        
+        try {
+            // Get list from room if initialized, else wait or use fetch
+            // Relying on window.multiplayerCursors.room is safest
+            if (!window.multiplayerCursors?.room) return; 
+            
+            const records = await window.multiplayerCursors.room.collection('custom_theme_v1').getList();
+            customThemes = records.reverse(); // Newest first
+            renderThemesList();
+
+            // Restore applied theme if any
+            const savedId = localStorage.getItem('websim_custom_theme_id');
+            if (savedId && document.getElementById('custom-theme-style').textContent === "") {
+                const savedTheme = customThemes.find(t => t.id === savedId);
+                if (savedTheme) {
+                    applyCustomCss(savedTheme.css, savedTheme.id, false);
+                }
+            }
+        } catch(e) {
+            console.warn("Error loading themes", e);
+        }
+      }
+
+      async function renderThemesList() {
+         const list = document.getElementById('custom-themes-list');
+         if (!list) return;
+         list.innerHTML = '';
+         
+         const user = await window.websim.getCurrentUser();
+         const currentAppliedId = localStorage.getItem('websim_custom_theme_id');
+         const searchInput = document.getElementById('theme-search-input');
+         const query = searchInput ? searchInput.value : "";
+
+         let displayThemes = customThemes;
+
+         if (query.trim()) {
+             const filters = { name: null, author: null, css: null };
+             let general = query;
+             
+             // Extract keys like name:"foo" or css:background
+             const keyRegex = /(name|author|css):(?:"([^"]*)"|([^ ]+))/gi;
+             general = general.replace(keyRegex, (match, key, val1, val2) => {
+                 filters[key.toLowerCase()] = (val1 || val2).toLowerCase();
+                 return ""; // remove from general
+             }).toLowerCase().trim();
+             
+             displayThemes = customThemes.filter(theme => {
+                 const tName = (theme.name || "").toLowerCase();
+                 const tAuthor = (theme.creator_username || "").toLowerCase();
+                 const tCss = (theme.css || "").toLowerCase();
+                 
+                 if (filters.name && !tName.includes(filters.name)) return false;
+                 if (filters.author && !tAuthor.includes(filters.author)) return false;
+                 if (filters.css && !tCss.includes(filters.css)) return false;
+                 
+                 if (general) {
+                     return tName.includes(general) || tAuthor.includes(general) || tCss.includes(general);
+                 }
+                 return true;
+             });
+         }
+
+         displayThemes.forEach(theme => {
+             const div = document.createElement('div');
+             div.className = 'custom-theme-item';
+             // Allow either the theme creator OR the project owner to edit/delete
+             const isOwner = user && (theme.creator_id === user.id || user.id === window.WEBSIM_PROJECT_CREATOR_ID);
+             
+             const isApplied = currentAppliedId === theme.id;
+             
+            // Sanitize theme name and author to prevent XSS before inserting into DOM
+            const safeName = (typeof DOMPurify !== 'undefined') ? DOMPurify.sanitize(String(theme.name || '')) : String(theme.name || '');
+            const safeAuthor = (typeof DOMPurify !== 'undefined') ? DOMPurify.sanitize(String(theme.creator_username || 'unknown')) : String(theme.creator_username || 'unknown');
+
+            div.innerHTML = `
+                <div class="theme-info">
+                    <div class="theme-name"></div>
+                    <div class="theme-author"></div>
+                </div>
+                <div class="theme-buttons">
+                    ${isOwner ? `<button class="theme-edit-btn custom-popup-btn secondary" style="padding:4px 8px; font-size:11px;" title="Edit">✏️</button>` : ''}
+                    ${isOwner ? `<button class="theme-del-btn" title="Delete">🗑️</button>` : ''}
+                    <button class="theme-remix-btn custom-popup-btn secondary" style="padding:4px 8px; font-size:11px;" title="Remix">🔀 Remix</button>
+                    <button class="theme-like-btn" title="Like">👍 <span class="like-count">0</span></button>
+                    <button class="theme-dislike-btn" title="Dislike">👎 <span class="dislike-count">0</span></button>
+                    <button class="theme-apply-btn ${isApplied ? 'applied' : ''}" title="${isApplied ? 'Click to unapply' : 'Apply'}">${isApplied ? 'Active ✖' : 'Apply'}</button>
+                </div>
+             `;
+            // Set textContent (safe) rather than injecting raw HTML
+            const nameEl = div.querySelector('.theme-name');
+            const authorEl = div.querySelector('.theme-author');
+            if (nameEl) nameEl.textContent = safeName;
+            if (authorEl) authorEl.textContent = 'by @' + safeAuthor;
+             
+             if (isOwner) {
+                 // Edit Handler
+                 div.querySelector('.theme-edit-btn').addEventListener('click', (e) => {
+                     e.stopPropagation();
+                     // Populate and open editor
+                     editingThemeId = theme.id;
+                     document.getElementById('create-theme-modal-title').textContent = "Edit Theme: " + theme.name;
+                     document.getElementById('create-theme-name').value = theme.name;
+                     document.getElementById('create-theme-css').value = theme.css;
+                     
+                     // Restore history if available
+                     try {
+                        themeHistory = theme.history ? JSON.parse(theme.history) : [];
+                     } catch(err) {
+                        themeHistory = [];
+                     }
+                     activeVersionId = null; // Reset selection
+                     
+                     const overlay = document.getElementById('create-theme-overlay');
+                     overlay.style.display = 'flex';
+                     document.getElementById('create-theme-save').textContent = "Update Theme";
+                     // Update preview
+                     updateThemePreview(theme.css);
+                     renderHistoryList();
+                 });
+
+                 // Delete Handler
+                 div.querySelector('.theme-del-btn').addEventListener('click', async (e) => {
+                     e.stopPropagation();
+                     if(confirm("Delete this theme?")) {
+                         await window.multiplayerCursors.room.collection('custom_theme_v1').delete(theme.id);
+                         loadCustomThemes();
+                     }
+                 });
+             }
+
+             // Remix handler: open create modal pre-filled and mark parent for save
+             const remixBtn = div.querySelector('.theme-remix-btn');
+             remixBtn.addEventListener('click', (e) => {
+                 e.stopPropagation();
+                 editingThemeId = null;
+                 document.getElementById('create-theme-modal-title').textContent = "Remix Theme: " + theme.name;
+                 document.getElementById('create-theme-name').value = theme.name + " (remix)";
+                 document.getElementById('create-theme-css').value = theme.css || '';
+                 // Store parent id in a global temporary variable used during save
+                 window.__remix_parent_id = theme.id;
+                 const overlay = document.getElementById('create-theme-overlay');
+                 overlay.style.display = 'flex';
+                 document.getElementById('create-theme-save').textContent = "Save Remix";
+                 updateThemePreview(theme.css || '');
+                 renderHistoryList();
+             });
+
+             // Like / Dislike wiring (reads counts and toggles)
+             async function refreshCounts() {
+                 try {
+                     const room = window.multiplayerCursors?.room;
+                     if (!room) return;
+                     const likes = await room.collection('theme_like_v1').filter({ theme_id: theme.id, type: 'like' }).getList();
+                     const dislikes = await room.collection('theme_like_v1').filter({ theme_id: theme.id, type: 'dislike' }).getList();
+                     div.querySelector('.like-count').textContent = (likes || []).length;
+                     div.querySelector('.dislike-count').textContent = (dislikes || []).length;
+                 } catch (err) { console.warn('Failed to refresh like counts', err); }
+             }
+
+             const likeBtn = div.querySelector('.theme-like-btn');
+             const dislikeBtn = div.querySelector('.theme-dislike-btn');
+             likeBtn.addEventListener('click', async (e) => {
+                 e.stopPropagation();
+                 try {
+                     const room = window.multiplayerCursors?.room;
+                     if (!room) return;
+                     const me = await window.websim.getCurrentUser();
+                     // prevent duplicate likes by same user: create record with unique (theme_id + user_id + type)
+                     const exists = (await room.collection('theme_like_v1').filter({ theme_id: theme.id, user_id: me.id, type: 'like' }).getList());
+                     if ((exists || []).length) {
+                         // Remove like (toggle)
+                         for (const r of exists) {
+                             await room.collection('theme_like_v1').delete(r.id);
+                         }
+                     } else {
+                         // Remove any existing dislike by this user
+                         const existingDis = (await room.collection('theme_like_v1').filter({ theme_id: theme.id, user_id: me.id, type: 'dislike' }).getList()) || [];
+                         for (const r of existingDis) await room.collection('theme_like_v1').delete(r.id);
+                         await room.collection('theme_like_v1').create({ theme_id: theme.id, user_id: me.id, username: me.username, type: 'like', created_at: Date.now() });
+                     }
+                     await refreshCounts();
+                 } catch (err) { console.error(err); }
+             });
+
+             dislikeBtn.addEventListener('click', async (e) => {
+                 e.stopPropagation();
+                 try {
+                     const room = window.multiplayerCursors?.room;
+                     if (!room) return;
+                     const me = await window.websim.getCurrentUser();
+                     const exists = (await room.collection('theme_like_v1').filter({ theme_id: theme.id, user_id: me.id, type: 'dislike' }).getList());
+                     if ((exists || []).length) {
+                         for (const r of exists) {
+                             await room.collection('theme_like_v1').delete(r.id);
+                         }
+                     } else {
+                         const existingLike = (await room.collection('theme_like_v1').filter({ theme_id: theme.id, user_id: me.id, type: 'like' }).getList()) || [];
+                         for (const r of existingLike) await room.collection('theme_like_v1').delete(r.id);
+                         await room.collection('theme_like_v1').create({ theme_id: theme.id, user_id: me.id, username: me.username, type: 'dislike', created_at: Date.now() });
+                     }
+                     await refreshCounts();
+                 } catch (err) { console.error(err); }
+             });
+
+             // Initial fetch
+             refreshCounts();
+
+             // Apply Handler
+             const applyBtn = div.querySelector('.theme-apply-btn');
+             applyBtn.addEventListener('click', () => {
+                 if (currentAppliedId === theme.id) {
+                     // Unapply
+                     applyCustomCss("", null);
+                     renderThemesList();
+                 } else {
+                     openReviewModal(theme);
+                 }
+             });
+
+             list.appendChild(div);
+         });
+      }
+
+      async function openReviewModal(theme) {
+          const overlay = document.getElementById('review-theme-overlay');
+          const loading = document.getElementById('review-loading');
+          const content = document.getElementById('review-content');
+          const codePre = document.getElementById('review-code');
+          const descP = document.getElementById('review-desc');
+          const safetyDiv = document.getElementById('review-safety');
+          const applyBtn = document.getElementById('review-theme-apply');
+          
+          overlay.style.display = 'flex';
+          loading.style.display = 'block';
+          content.style.display = 'none';
+          applyBtn.disabled = true;
+
+          currentReviewCss = theme.css;
+          currentReviewThemeId = theme.id;
+          codePre.textContent = theme.css;
+
+          try {
+            // Fetch base CSS for context
+            let baseCss = "";
+            try {
+                const res = await fetch('style.css');
+                baseCss = await res.text();
+            } catch(e) {}
+            if (baseCss.length > 10000) baseCss = baseCss.substring(0, 10000) + "...(truncated)";
+
+            const prompt = `
+You are a security expert. Analyze this Custom CSS for a web app.
+Base CSS context:
+\`\`\`css
+${baseCss}
+\`\`\`
+Custom CSS:
+\`\`\`css
+${theme.css}
+\`\`\`
+1. Check for malicious code (external urls, clickjacking, overlay obscuring).
+2. Briefly describe visual changes.
+Output JSON: { "is_safe": boolean, "safety_concerns": "string|null", "description": "string" }
+`;
+            const aiRes = await window.websim.chat.completions.create({
+                messages: [{ role: "user", content: prompt }],
+                json: true
+            });
+            
+            const result = JSON.parse(aiRes.content);
+            
+            loading.style.display = 'none';
+            content.style.display = 'block';
+            
+            descP.textContent = result.description || "No description provided.";
+            
+            if (result.is_safe) {
+                safetyDiv.textContent = "✅ AI detected no obvious threats.";
+                safetyDiv.style.background = "rgba(30, 80, 40, 0.3)";
+                safetyDiv.style.color = "#8fdda0";
+                applyBtn.disabled = false;
+            } else {
+                safetyDiv.textContent = "⚠️ CAUTION: " + (result.safety_concerns || "Potential safety issues detected.");
+                safetyDiv.style.background = "rgba(80, 30, 30, 0.3)";
+                safetyDiv.style.color = "#ffb4a8";
+                applyBtn.disabled = false; // Let user decide, but warned
+            }
+
+          } catch (e) {
+              console.error(e);
+              loading.textContent = "Error analyzing theme. Please check code manually.";
+              applyBtn.disabled = false;
+              content.style.display = 'block'; // Show code at least
+          }
+      }
+
+      function applyCustomCss(css, id, save=true) {
+          const styleTag = document.getElementById('custom-theme-style');
+          if (styleTag) styleTag.textContent = css;
+          
+          // Reset default theme radios if a custom theme is applied
+          if (id) {
+             document.querySelectorAll('#settings-panel input[name="theme"]').forEach(r => r.checked = false);
+             // Remove standard theme classes to allow full override if needed, 
+             // or keep them? Usually better to keep base and override. 
+             // For now, we just layer on top.
+          } else {
+             // Restore default theme selection UI
+             const savedTheme = localStorage.getItem('websim_theme_v1') || 'planet';
+             const r = document.querySelector(`#settings-panel input[value="${savedTheme}"]`);
+             if(r) r.checked = true;
+          }
+
+          if (save) {
+              if (id) localStorage.setItem('websim_custom_theme_id', id);
+              else localStorage.removeItem('websim_custom_theme_id');
+              renderThemesList(); // Refresh UI buttons
+          }
+      }
+
+      function initThemePreviewHTML() {
+          if (!previewShadowRoot) return;
+          
+          // Construct a mock UI that reflects the main page structure.
+          // Note: We use the same IDs/Classes so the CSS applies.
+          // Since it's inside Shadow DOM, IDs won't conflict with main page.
+          // IMPORTANT: We wrap content in a div with transform to trap fixed positioning.
+          
+          previewShadowRoot.innerHTML = `
+            <style id="base-style"></style>
+            <style id="custom-style"></style>
+            <div id="preview-viewport" style="transform: translate(0,0); width: 100%; height: 100%; position: relative; overflow: hidden; background: #0b0f18;">
+                
+                <!-- Mock Header -->
+                <div id="header-bar" style="position:absolute; width:100%;">
+                    <span id="status">Ready</span>
+                    <button class="header-icon-btn">👥</button>
+                    <button class="header-icon-btn">👤</button>
+                    <button class="header-icon-btn">⚙️</button>
+                </div>
+
+                <!-- Mock Screen Area -->
+                <div id="screen" style="position: absolute; top: 56px; bottom: 0; width: 100%; display: flex; align-items: center; justify-content: center;">
+                    <div style="color: #555; font-size: 24px; font-weight: bold;">VM Screen</div>
+                </div>
+
+                <!-- Mock OS Switcher (Open) -->
+                <div id="osSwitcherContainer" class="active" style="position: absolute; top: 70px; left: 10px; max-height: 300px;">
+                    <div id="osSwitcherTitle">OS SELECTION</div>
+                    <span id="osSwitcherSubtitle">Preview Mode</span>
+                    <h2 class="category-header">Windows</h2>
+                    <div class="osSwitcherBtnRow" style="grid-template-columns: 1fr;">
+                        <button class="os-switch-btn" aria-current="true">
+                            <div class="os-icon" style="background:#00ccff;"></div>
+                            <div class="vm-label">Windows XP</div>
+                            <div class="vm-desc">Experience the bliss.</div>
+                        </button>
+                        <button class="os-switch-btn">
+                            <div class="os-icon" style="background:#ff5555;"></div>
+                            <div class="vm-label">Windows 11</div>
+                            <div class="vm-desc">The newest one.</div>
+                        </button>
+                    </div>
+                </div>
+
+                <!-- Mock Chat -->
+                <div id="chatContainer" style="position: absolute; bottom: 10px; right: 10px; height: auto;">
+                    <div id="chatHeader">
+                        <span>Chat</span>
+                        <button>-</button>
+                    </div>
+                    <div id="chatMessages" style="height: 150px;">
+                        <div class="chat-message">
+                            <div class="chat-avatar" style="background: #555;"></div>
+                            <div class="chat-content">
+                                <div class="chat-header"><span class="chat-nickname">User</span></div>
+                                <div class="chat-body">Hello world!</div>
+                            </div>
+                        </div>
+                        <div class="chat-message own-message">
+                            <div class="chat-avatar" style="background: #2a7e68;"></div>
+                            <div class="chat-content">
+                                <div class="chat-header"><span class="chat-nickname">Me</span></div>
+                                <div class="chat-body">This is my theme.</div>
+                            </div>
+                        </div>
+                    </div>
+                    <div id="chatInput">
+                        <input type="text" id="chatTextInput" placeholder="Type a message..." maxlength="200">
+                        <button id="chatSendButton">Send</button>
+                    </div>
+                </div>
+
+                <!-- Mock Settings Panel -->
+                <div id="settings-panel" class="active" style="position: absolute; top: 70px; right: 10px;">
+                    <h4>Theme</h4>
+                    <label class="theme-option">
+                        <span>Planet (current)</span>
+                    </label>
+                    <label class="theme-option">
+                        <span>Dark Mode</span>
+                    </label>
+                </div>
+
+                <!-- Mock Footer -->
+                <div id="bottom-bar" style="position: absolute; bottom: 10px; left: 10px;">
+                    <button>⌨️</button>
+                </div>
+
+            </div>
+          `;
+          
+          // Inject base CSS
+          if (baseCssContent) {
+              previewShadowRoot.getElementById('base-style').textContent = baseCssContent;
+          } else {
+              // Retry shortly if not ready
+              setTimeout(() => {
+                  if (baseCssContent && previewShadowRoot) {
+                      previewShadowRoot.getElementById('base-style').textContent = baseCssContent;
+                  }
+              }, 1000);
+          }
+      }
+
+      function updateThemePreview(css) {
+          if (previewShadowRoot) {
+              previewShadowRoot.getElementById('custom-style').textContent = css;
+          }
+      }
+
+      // New: Custom Popup System
+      function showCustomPopup(title, message, buttons = [{ text: 'OK', value: true, class: 'primary' }], allowHtml = false) {
+        return new Promise(resolve => {
+            const overlay = document.getElementById('custom-popup-overlay');
+            const titleEl = document.getElementById('custom-popup-title');
+            const messageEl = document.getElementById('custom-popup-message');
+            const buttonsEl = document.getElementById('custom-popup-buttons');
+
+            if (!overlay || !titleEl || !messageEl || !buttonsEl) {
+                console.error('Custom popup elements not found!');
+                resolve(null);
+                return;
+            }
+
+            if (allowHtml) {
+                titleEl.innerHTML = title;
+                messageEl.innerHTML = message;
+            } else {
+                titleEl.textContent = title;
+                messageEl.textContent = message;
+            }
+            buttonsEl.innerHTML = '';
+
+            const closePopup = (value) => {
+                overlay.style.display = 'none';
+                resolve(value);
+            };
+
+            buttons.forEach(btnInfo => {
+                const button = document.createElement('button');
+                button.textContent = btnInfo.text;
+                button.className = `custom-popup-btn ${btnInfo.class || 'secondary'}`;
+                button.onclick = () => closePopup(btnInfo.value);
+                buttonsEl.appendChild(button);
+            });
+            
+            // Close on overlay click if there is a 'cancel' or 'no' button
+            overlay.onclick = (e) => {
+                if (e.target === overlay) {
+                    const secondaryAction = buttons.find(b => !b.class || b.class === 'secondary');
+                    if (secondaryAction) {
+                        closePopup(secondaryAction.value);
+                    }
+                }
+            };
+            
+            overlay.style.display = 'flex';
+        });
+      }
+      // Make it globally available
+      window.showCustomPopup = showCustomPopup;
+
+      document.addEventListener('DOMContentLoaded', () => {
+        const overlay = document.getElementById('profile-popup-overlay');
+        const closeBtn = document.getElementById('profile-popup-close');
+
+        if (overlay && closeBtn) {
+          const close = () => overlay.style.display = 'none';
+          closeBtn.addEventListener('click', close);
+          overlay.addEventListener('click', (e) => {
+            if (e.target === overlay) close();
+          });
+        }
+      });
+
+      document.addEventListener('DOMContentLoaded', () => {
+        setupSettingsPanel();
+        initExtendedSettings();
+        
+        // Like and Tip Prompt logic
+        // Helper: show tutorial (moved to global so it can be reused elsewhere)
+        async function showMainTutorial(force = false) {
+          if (!force && localStorage.getItem('websim_seen_tutorial_v1') === 'true') return;
+          const content = `
+            <div style="display:flex; flex-direction:column; gap:12px; max-height:60vh; overflow:auto; padding-right: 8px;">
+              <div style="font-size:16px; font-weight:800; color:#bfe7ff;">Welcome to the VMsHARE Quick Tour</div>
+              <div style="font-size:13px; color:#dbe9ff;">
+                This short guide shows what the header and main controls do; icons are shown as interactive buttons so you can see how they look — hover over them to reveal their name (just like the header buttons):
+              </div>
+
+              <div style="display:flex; gap:10px; flex-wrap:wrap; align-items:flex-start;">
+                <button class="tutorial-btn header-icon-btn" style="display:flex; align-items:center; gap:8px;">👥 <span class="btn-text">Players</span></button>
+                <div style="flex:1; min-width:220px;">
+                  <div style="font-weight:700; color:#eaf2ff;">Players</div>
+                  <div style="font-size:13px; color:#dbe9ff;">Opens the players panel to see who is online and in each VM.</div>
+                </div>
+              </div>
+
+              <div style="display:flex; gap:10px; flex-wrap:wrap; align-items:flex-start;">
+                <button class="tutorial-btn header-icon-btn" style="display:flex; align-items:center; gap:8px;">👤 <span class="btn-text">Profile</span></button>
+                <div style="flex:1; min-width:220px;">
+                  <div style="font-weight:700; color:#eaf2ff;">Profile</div>
+                  <div style="font-size:13px; color:#dbe9ff;">View or edit your profile and custom tag.</div>
+                </div>
+              </div>
+
+              <div style="display:flex; gap:10px; flex-wrap:wrap; align-items:flex-start;">
+                <button class="tutorial-btn header-icon-btn" style="display:flex; align-items:center; gap:8px;">📢 <span class="btn-text">Announce</span></button>
+                <div style="flex:1; min-width:220px;">
+                  <div style="font-weight:700; color:#eaf2ff;">Announce</div>
+                  <div style="font-size:13px; color:#dbe9ff;">Post announcements (requires permission).</div>
+                </div>
+              </div>
+
+              <div style="display:flex; gap:10px; flex-wrap:wrap; align-items:flex-start;">
+                <button class="tutorial-btn header-icon-btn" style="display:flex; align-items:center; gap:8px;">🎨 <span class="btn-text">Themes</span></button>
+                <div style="flex:1; min-width:220px;">
+                  <div style="font-weight:700; color:#eaf2ff;">Themes</div>
+                  <div style="font-size:13px; color:#dbe9ff;">Open theme editor and apply custom themes.</div>
+                </div>
+              </div>
+
+              <div style="display:flex; gap:10px; flex-wrap:wrap; align-items:flex-start;">
+                <button class="tutorial-btn header-icon-btn" style="display:flex; align-items:center; gap:8px;">⚙️ <span class="btn-text">Settings</span></button>
+                <div style="flex:1; min-width:220px;">
+                  <div style="font-weight:700; color:#eaf2ff;">Settings</div>
+                  <div style="font-size:13px; color:#dbe9ff;">Toggle visual and chat settings.</div>
+                </div>
+              </div>
+
+              <div style="display:flex; gap:10px; flex-wrap:wrap; align-items:flex-start;">
+                <button class="tutorial-btn header-icon-btn" style="display:flex; align-items:center; gap:8px;">↻ <span class="btn-text">Reconnect</span></button>
+                <div style="flex:1; min-width:220px;">
+                  <div style="font-weight:700; color:#eaf2ff;">Reconnect</div>
+                  <div style="font-size:13px; color:#dbe9ff;">Reconnects the network and VNC if needed.</div>
+                </div>
+              </div>
+
+              <div style="display:flex; gap:10px; flex-wrap:wrap; align-items:flex-start;">
+                <button class="tutorial-btn header-icon-btn" style="display:flex; align-items:center; gap:8px;">📘 <span class="btn-text">Tutorial</span></button>
+                <div style="flex:1; min-width:220px;">
+                  <div style="font-weight:700; color:#eaf2ff;">Tutorial</div>
+                  <div style="font-size:13px; color:#dbe9ff;">Opens this guide again.</div>
+                </div>
+              </div>
+
+              <div style="display:flex; gap:10px; flex-wrap:wrap; align-items:flex-start;">
+                <button class="tutorial-btn header-icon-btn" style="display:flex; align-items:center; gap:8px;">🕹️ <span class="btn-text">Controls</span></button>
+                <div style="flex:1; min-width:220px;">
+                  <div style="font-weight:700; color:#eaf2ff;">Controls</div>
+                  <div style="font-size:13px; color:#dbe9ff;">View VM actions, rules, and active votes. Only visible if the VM has custom actions.</div>
+                </div>
+              </div>
+
+              <div style="display:flex; gap:10px; flex-wrap:wrap; align-items:flex-start;">
+                <button class="tutorial-btn header-icon-btn" style="display:flex; align-items:center; gap:8px;">🚩 <span class="btn-text">Report</span></button>
+                <div style="flex:1; min-width:220px;">
+                  <div style="font-weight:700; color:#eaf2ff;">Report</div>
+                  <div style="font-size:13px; color:#dbe9ff;">Report the current VM to moderators.</div>
+                </div>
+              </div>
+
+              <div style="display:flex; gap:10px; flex-wrap:wrap; align-items:flex-start;">
+                <button class="tutorial-btn header-icon-btn" style="display:flex; align-items:center; gap:8px;">☁️ <span class="btn-text">Cloud</span></button>
+                <div style="flex:1; min-width:220px;">
+                  <div style="font-weight:700; color:#eaf2ff;">Cloud</div>
+                  <div style="font-size:13px; color:#dbe9ff;">Access shared cloud storage.</div>
+                </div>
+              </div>
+
+              <div style="display:flex; gap:10px; flex-wrap:wrap; align-items:flex-start;">
+                <button class="tutorial-btn header-icon-btn" style="display:flex; align-items:center; gap:8px;">🔑 <span class="btn-text">Password</span></button>
+                <div style="flex:1; min-width:220px;">
+                  <div style="font-weight:700; color:#eaf2ff;">Password</div>
+                  <div style="font-size:13px; color:#dbe9ff;">Retype VM password for manual-password VMs.</div>
+                </div>
+              </div>
+
+              <div style="display:flex; gap:10px; flex-wrap:wrap; align-items:flex-start;">
+                <button class="tutorial-btn header-icon-btn" style="display:flex; align-items:center; gap:8px;">📖 <span class="btn-text">Wiki</span></button>
+                <div style="flex:1; min-width:220px;">
+                  <div style="font-weight:700; color:#eaf2ff;">Wiki</div>
+                  <div style="font-size:13px; color:#dbe9ff;">Read the VMsHARE documentation.</div>
+                </div>
+              </div>
+
+              <div style="display:flex; gap:10px; flex-wrap:wrap; align-items:flex-start;">
+                <button class="tutorial-btn header-icon-btn" style="display:flex; align-items:center; gap:8px;">🚀 <span class="btn-text">Self-Host</span></button>
+                <div style="flex:1; min-width:220px;">
+                  <div style="font-weight:700; color:#eaf2ff;">Self-Host</div>
+                  <div style="font-size:13px; color:#dbe9ff;">Add your own VNC server to the list!</div>
+                </div>
+              </div>
+
+              <div style="display:flex; gap:10px; flex-wrap:wrap; align-items:flex-start;">
+                <button class="tutorial-btn header-icon-btn" style="display:flex; align-items:center; gap:8px;"><img src="https://www.svgrepo.com/show/353655/discord-icon.svg" style="width:16px;height:16px;" /> <span class="btn-text">Discord</span></button>
+                <div style="flex:1; min-width:220px;">
+                  <div style="font-weight:700; color:#eaf2ff;">Discord</div>
+                  <div style="font-size:13px; color:#dbe9ff;">Join our community chat.</div>
+                </div>
+              </div>
+
+              <div style="display:flex; gap:10px; flex-wrap:wrap; align-items:flex-start;">
+                <button class="tutorial-btn header-icon-btn" style="display:flex; align-items:center; gap:8px;">💰 <span class="btn-text">Tip Jar</span></button>
+                <div style="flex:1; min-width:220px;">
+                  <div style="font-weight:700; color:#eaf2ff;">Tip Jar</div>
+                  <div style="font-size:13px; color:#dbe9ff;">Open the tip jar and leaderboard.</div>
+                </div>
+              </div>
+
+              <div style="display:flex; gap:10px; flex-wrap:wrap; align-items:flex-start;">
+                <button class="tutorial-btn header-icon-btn" style="display:flex; align-items:center; gap:8px;">📸 <span class="btn-text">Screenshot</span></button>
+                <div style="flex:1; min-width:220px;">
+                  <div style="font-weight:700; color:#eaf2ff;">Screenshot</div>
+                  <div style="font-size:13px; color:#dbe9ff;">Take a screenshot of the VM and post it to comments.</div>
+                </div>
+              </div>
+
+              <div style="display:flex; gap:10px; flex-wrap:wrap; align-items:flex-start;">
+                <button class="tutorial-btn header-icon-btn" style="display:flex; align-items:center; gap:8px;">🌐 <span class="btn-text">Network</span></button>
+                <div style="flex:1; min-width:220px;">
+                  <div style="font-weight:700; color:#eaf2ff;">Network</div>
+                  <div style="font-size:13px; color:#dbe9ff;">Full system reconnect for chat, network, and VNC. (Bottom Bar)</div>
+                </div>
+              </div>
+
+              <div style="display:flex; gap:10px; flex-wrap:wrap; align-items:flex-start;">
+                <button class="tutorial-btn header-icon-btn" style="display:flex; align-items:center; gap:8px;">⌨️ <span class="btn-text">Keyboard</span></button>
+                <div style="flex:1; min-width:220px;">
+                  <div style="font-weight:700; color:#eaf2ff;">Keyboard</div>
+                  <div style="font-size:13px; color:#dbe9ff;">Open the virtual keyboard input for mobile or keysending. (Bottom Bar)</div>
+                </div>
+              </div>
+
+              <div style="display:flex; gap:10px; flex-wrap:wrap; align-items:flex-start;">
+                <button class="tutorial-btn header-icon-btn" style="display:flex; align-items:center; gap:8px;">🚨 <span class="btn-text">Shortcuts</span></button>
+                <div style="flex:1; min-width:220px;">
+                  <div style="font-weight:700; color:#eaf2ff;">Shortcuts</div>
+                  <div style="font-size:13px; color:#dbe9ff;">Quick shortcuts like Ctrl+Alt+Del, Alt+F4, Win+R. (Bottom Bar)</div>
+                </div>
+              </div>
+
+              <div style="font-size:13px; color:#dbe9ff;">Hover any of the little icon buttons above to reveal their label (this matches how the header buttons show names on hover). Click any to try them — this tutorial will not show again after you finish.</div>
+            </div>
+          `;
+          await showCustomPopup('VMsHARE — Quick Tutorial', content, [
+            { text: 'Got it', value: true, class: 'primary' }
+          ], true);
+          localStorage.setItem('websim_seen_tutorial_v1', 'true');
+        }
+        // Expose globally so other scripts (script.js) can call the tutorial reliably
+        window.showMainTutorial = showMainTutorial;
+
+        const triggerLikeAndTipPopup = async () => {
+          // Ensure we only run the sequence once at a time and respect existing popups.
+          const HIDE_KEY = 'websim_hide_tip_prompt_ever';
+          if (localStorage.getItem(HIDE_KEY) === 'true') return;
+
+          // Welcome popup (uses existing popup system; not a new DOM element)
+          try {
+            const seenWelcome = localStorage.getItem('websim_seen_welcome_v1') === 'true';
+            if (!seenWelcome) {
+              await showCustomPopup(
+                'Welcome to VMsHARE',
+                'Welcome! This site lets you try public VMs in-browser; use the header buttons to navigate and interact — Players, Profile, Announce, Themes, Settings, Reconnect, Report, Password, Tip Jar.',
+                [{ text: 'Continue', value: true, class: 'primary' }],
+                false
+              );
+              localStorage.setItem('websim_seen_welcome_v1', 'true');
+            }
+          } catch (e) {
+            console.warn('Welcome popup failed:', e);
+          }
+
+          // Existing tip popup content (unchanged)
+          const messageHtml = `
+            <div style="margin-bottom: 20px; text-align: center; overflow-y: auto; flex: 1;">
+              <div style="font-size: 48px; margin-bottom: 15px; filter: drop-shadow(0 0 10px rgba(255,215,0,0.4));">💎</div>
+              <div style="font-size: 15px; line-height: 1.6; color: #e0f0ff; background: rgba(255,255,255,0.03); padding: 15px; border-radius: 12px; border: 1px solid rgba(255,255,255,0.05);">
+                If you have the credits, please <strong style="color: #ffd700;">tip</strong>! It helps a lot with the project, since i now only have 100 runs per day. Previously i had 300.<br><br>
+                Liking is <strong style="color: #4fd3ff;">free</strong>! If you enjoy the project, please like! Suggest additions in the comments.
+              </div>
+            </div>
+            <div style="display: flex; justify-content: center; width: 100%;">
+              <label style="display: flex; align-items: center; gap: 10px; font-size: 12px; cursor: pointer; color: #718096; user-select: none; transition: color 0.2s;">
+                <input type="checkbox" id="tip-prompt-dont-show-checkbox" style="cursor: pointer; accent-color: #4fd3ff; width: 16px; height: 16px; margin: 0;">
+                don't show this again
+              </label>
+            </div>
+          `;
+
+          // Show the Like & Tip popup (existing)
+          const result = await showCustomPopup(
+            'Please Like and Tip!',
+            messageHtml,
+            [{ text: 'Okay', value: true, class: 'primary' }],
+            true
+          );
+
+          if (result) {
+            const checkbox = document.getElementById('tip-prompt-dont-show-checkbox');
+            if (checkbox && checkbox.checked) {
+              localStorage.setItem(HIDE_KEY, 'true');
+            }
+          }
+
+          // After the tip popup completes, show the main tutorial once (new tutorial popup only)
+          try {
+            await showMainTutorial();
+          } catch (e) {
+            console.warn('Tutorial popup failed:', e);
+          }
+
+          // Re-schedule next popup for a random interval between 5 and 20 minutes
+          const min = 5 * 60 * 1000;
+          const max = 20 * 60 * 1000;
+          const delay = Math.floor(Math.random() * (max - min + 1) + min);
+          setTimeout(triggerLikeAndTipPopup, delay);
+        };
+
+        // Initial trigger on load (with slight delay for UI to settle)
+        setTimeout(triggerLikeAndTipPopup, 2000);
+      });
+
+      document.addEventListener('DOMContentLoaded', async () => {
+        const header = document.getElementById('header-bar');
+        if (!header) return;
+
+        // Ensure Reconnect and Players and Report have consistent header styling
+        const playerBtn = document.getElementById('playerListToggle');
+        if (playerBtn) playerBtn.classList.add('header-icon-btn');
+
+        const reconnectBtn = document.getElementById('reconnect-btn');
+        if (reconnectBtn) reconnectBtn.classList.add('header-icon-btn');
+
+        const reportBtn = document.getElementById('report-button');
+        if (reportBtn) reportBtn.classList.add('header-icon-btn');
+
+        const annBtn = document.getElementById('announcementComposerToggle');
+        if (annBtn) annBtn.classList.add('header-icon-btn');
+
+        // Create Tip Jar button - styled like others
+        let tipBtn = document.getElementById('tip-jar-button');
+        if (!tipBtn) {
+          tipBtn = document.createElement('button');
+          tipBtn.id = 'tip-jar-button';
+          tipBtn.textContent = '💰';
+          tipBtn.setAttribute('aria-label', 'Tip Jar');
+          header.appendChild(tipBtn);
+        } else {
+          tipBtn.classList.add('header-icon-btn');
+        }
+
+        // Create Tip Jar container
+        let tipContainer = document.getElementById('tip-jar-container');
+        if (!tipContainer) {
+          tipContainer = document.createElement('div');
+          tipContainer.id = 'tip-jar-container';
+          tipContainer.innerHTML = `
+            <div id="tip-jar-header">
+              <h3>Tip Jar</h3>
+              <button id="tip-jar-close" title="Close">&times;</button>
+            </div>
+            <div id="tip-list"></div>
+            <div id="leaderboard">
+              <h4>Top Tippers</h4>
+              <ul id="leaderboard-list"></ul>
+            </div>
+          `;
+          document.body.appendChild(tipContainer);
+        }
+
+        tipBtn.addEventListener('click', async () => {
+          const willOpen = tipContainer.style.display !== 'flex';
+          tipContainer.style.display = willOpen ? 'flex' : 'none';
+          if (willOpen) { await loadTipData(); }
+        });
+        tipContainer.querySelector('#tip-jar-close').addEventListener('click', () => {
+          tipContainer.style.display = 'none';
+        });
+
+        let tipDataLoaded = false;
+        async function loadTipData() {
+          if (tipDataLoaded) return;
+          tipDataLoaded = true;
+          try {
+            const project = await window.websim.getCurrentProject();
+            const [tips1, tips2] = await Promise.all([
+              fetchAllTips(project.id),
+              fetchAllTips('c4at4hxgmwbmwvhevhbm')
+            ]);
+            const combined = [...tips1, ...tips2];
+            const unique = [];
+            const ids = new Set();
+            for (const t of combined) {
+                if (!ids.has(t.id)) {
+                    ids.add(t.id);
+                    unique.push(t);
+                }
+            }
+            renderTips(unique);
+          } catch (e) { renderTips([], true); }
+        }
+
+        async function fetchAllTips(projectId) {
+          const get = () => ({
+            limit: parseInt(localStorage.getItem('tip_limit') || '50', 10),
+            offset: parseInt(localStorage.getItem('tip_offset') || '0', 10),
+          });
+          const seen = new Set(); const all = [];
+          let { limit, offset } = get();
+          let start = offset | 0; let lastIds = null;
+          while (true) {
+            const res = await fetch(`/api/v1/projects/${projectId}/comments?only_tips=true&sort_by=created_at&limit=${limit}&offset=${start}`);
+            const json = await res.json();
+            const batch = (json?.comments?.data || []).map(d => d.comment);
+            const idsSig = batch.map(c => c.id).join(',');
+            if (!batch.length || idsSig === lastIds) break; // discard identical batch
+            lastIds = idsSig;
+            for (const c of batch) if (!seen.has(c.id)) { seen.add(c.id); all.push(c); } // dedupe by id
+            if (batch.length < limit) break;
+            start += limit;
+          }
+          return all;
+        }
+
+        function renderTips(tips, failed = false) {
+          const tipList = document.getElementById('tip-list');
+          const lbUl = document.getElementById('leaderboard-list');
+          if (failed) {
+            tipList.innerHTML = `<div class="tip-entry"><div class="tip-content">Failed to load tips</div><div class="tip-meta">Try again later</div></div>`;
+            lbUl.innerHTML = ''; return;
+          }
+          const totalShards = tips.reduce((sum, c) => sum + (c.card_data?.credits_spent || 0), 0);
+          tipList.innerHTML = `<div class="tip-entry" style="text-align:center;"><div class="tip-content"><strong>Total Shards Tipped:</strong></div><div class="tip-meta">${totalShards} shards</div></div>`;
+          const board = {}; tips.forEach(c => { const name = (c.author.display_name || c.author.username || 'Anonymous').trim(); const shards = c.card_data?.credits_spent || 0; board[name] = (board[name] || 0) + shards; });
+          const sorted = Object.entries(board).sort((a, b) => b[1] - a[1]);
+          lbUl.innerHTML = ''; sorted.forEach(([user, shards], idx) => { const li = document.createElement('li'); const medal = idx===0?'🥇 ':idx===1?'🥈 ':idx===2?'🥉 ':''; li.innerHTML = `<span>${medal}${user}</span><span>${shards} shards</span>`; lbUl.append(li); });
+        }
+      });
+
+      // === Announcements: Toggle + Post wiring ===
+      document.addEventListener('DOMContentLoaded', async () => {
+        const toggleBtn = document.getElementById('announcementComposerToggle');
+        const composer = document.getElementById('announcementComposer');
+        const textarea = document.getElementById('announcement-textarea');
+        const postBtn = document.getElementById('announcementComposeBtn');
+
+        if (!toggleBtn || !composer || !textarea || !postBtn) return;
+
+        let currentUser = null;
+        try { currentUser = await window.websim.getCurrentUser(); } catch {}
+        const username = currentUser?.username || '';
+        const avatarUrl = currentUser?.avatar_url || '';
+
+        // Permission: check for new announcement tags
+        const canPost = () => {
+          try {
+            if (!currentUser || !currentUser.id) return false;
+            const mc = window.multiplayerCursors;
+            if (mc && (mc.canSendGlobalAnnouncement(currentUser.id) || mc.canSendRoomAnnouncement(currentUser.id))) {
+                return true;
+            }
+          } catch {}
+          return false;
+        };
+
+        // Enable/disable Post button
+        const updatePostButtonState = () => {
+          const hasText = textarea.value.trim().length > 0;
+          postBtn.disabled = !hasText;
+        };
+        textarea.addEventListener('input', updatePostButtonState);
+        updatePostButtonState();
+
+        // Toggle composer
+        toggleBtn.addEventListener('click', () => {
+          if (!canPost()) {
+            if (window.showNotification) window.showNotification('You do not have permission to post announcements.', 'error');
+            return;
+          }
+          composer.classList.toggle('visible');
+
+          // Show overlay and close on click
+          const overlay = (typeof ensureOverlay === 'function') ? ensureOverlay() : document.getElementById('ui-overlay');
+          if (overlay) {
+            overlay.style.display = composer.classList.contains('visible') ? 'block' : 'none';
+            overlay.onclick = () => {
+              composer.classList.remove('visible');
+              overlay.style.display = 'none';
+              overlay.onclick = null;
+            };
+          }
+          if (composer.classList.contains('visible')) {
+            textarea.focus();
+          }
+        });
+
+        // Send announcement
+        postBtn.addEventListener('click', () => {
+          const content = textarea.value.trim();
+          if (!content) return;
+          if (!canPost()) {
+            if (window.showNotification) window.showNotification('You do not have permission to post announcements.', 'error');
+            return;
+          }
+
+          const payload = {
+            type: 'announcement',
+            content,
+            osCode: window.selected || '',
+            timestamp: Date.now(),
+          };
+
+          // Send via room (preferred) or websim helper
+          const sendFn = (typeof window.websim?.sendToRoom === 'function')
+            ? window.websim.sendToRoom
+            : (window.multiplayerCursors?.room?.send?.bind(window.multiplayerCursors.room));
+
+          if (sendFn) {
+            try { sendFn(payload); } catch (e) { console.warn('Failed to send announcement via room:', e); }
+          }
+
+          // Also render locally for immediate feedback
+          try {
+            window.multiplayerCursors?.addAnnouncementToDOM({
+              content,
+              author: username,
+              authorId: currentUser?.id || '',
+              avatarUrl: avatarUrl,
+              timestamp: payload.timestamp
+            });
+          } catch (e) { console.warn('Failed to render local announcement:', e); }
+
+          // Reset UI
+          textarea.value = '';
+          updatePostButtonState();
+          composer.classList.remove('visible');
+          const overlay = document.getElementById('ui-overlay');
+          if (overlay) overlay.style.display = 'none';
+        });
+      });
+    </script>
+
+    <script src="vnc-paste.js"></script>
+    <script src="tools.js"></script>
+
+    <div id="global-vote-overlay"></div>
+    <script type="module" src="multiplayer-cursors.js"></script>
+  </body>
+</html>

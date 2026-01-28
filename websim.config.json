@@ -1,0 +1,17 @@
+{
+  "proxies": {
+    "/test/*": {
+      "target": "https://e1x8.xyz/test/",
+      "rewrite_path": true
+    },
+    "/vmshareserver/*": {
+      "target": "https://e1x8.xyz/",
+      "rewrite_path": true
+    },
+    "/alltheinfo/*": {
+      "target": "https://e1x8.xyz/MODERATORS-ONLY",
+      "rewrite_path": true
+    }
+  }
+}
+

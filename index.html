@@ -1,0 +1,32 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>Site Wrapper</title>
+  <link rel="stylesheet" href="styles.css" />
+</head>
+<body>
+  <div id="app">
+    <div id="controls">
+      <input id="urlInput" type="url" value="https://web.cloudmoonapp.com/" placeholder="https://example.com/" />
+      <button id="loadBtn" title="Load site (must have permission)">Load</button>
+      <button id="fitBtn" title="Toggle fit/contain">Toggle Fit</button>
+      <div id="status"></div>
+    </div>
+
+    <div id="frameWrap" class="fit">
+      <!-- Sandbox intentionally DOES NOT include allow-popups / allow-popups-to-escape to keep popups contained.
+           It includes allow-scripts and allow-forms to permit normal site behavior where allowed by cross-origin policy.
+           Note: If the target site requires features blocked by the sandbox or by network filters, it may not work. -->
+      <iframe id="siteFrame" src="https://web.cloudmoonapp.com/" sandbox="allow-scripts allow-forms allow-same-origin"></iframe>
+    </div>
+
+    <footer id="legal">
+      Use only with permission. This wrapper does not bypass network or administrative controls.
+    </footer>
+  </div>
+
+  <script src="app.js"></script>
+</body>
+</html>
